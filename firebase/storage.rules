@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Drive in Car — Storage 보안 규칙
+// MVP: 아바타는 앱 번들 내장이라 Storage 사용 안 함.
+// 향후 코스 썸네일/유저 업로드를 위해 read-only로 잠가둔다.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 추후 admin이 업로드한 코스 썸네일 등을 모든 로그인 사용자가 읽기 가능
+    match /courses/{path=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // 그 외 모든 경로는 거부
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

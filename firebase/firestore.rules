@@ -1,0 +1,109 @@
+rules_version = '2';
+
+// Drive in Car — Firestore 보안 규칙
+// 프로젝트: drive-3c0fd
+//
+// 핵심 원칙:
+//  - 모든 read는 로그인 필요
+//  - 사용자는 본인의 users/{uid}와 본인의 rankings만 쓸 수 있다
+//  - rankings는 한 번 쓰면 update/delete 영구 금지 (시간 조작 방지)
+//  - courses/meta는 클라이언트 read-only (콘솔/시드 스크립트 전용)
+//  - 안티치트: timeMs >= 30000, averageKmh <= 200을 서버 측에서도 강제
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function validNickname(s) {
+      return s is string && s.size() >= 2 && s.size() <= 16;
+    }
+
+    function validAvatarId(s) {
+      return s is string && s.matches('^avatar_0[1-8]$');
+    }
+
+    // -----------------------------------------------------------------
+    // meta/* — 동적 설정 (avatars, config). 클라이언트는 read-only.
+    // -----------------------------------------------------------------
+    match /meta/{doc} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // -----------------------------------------------------------------
+    // users/{uid} — 본인만 쓰기. 닉네임/아바타 검증.
+    // -----------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasAll([
+             'nickname', 'carBrand', 'carModel',
+             'profileImageId', 'createdAt'
+           ])
+        && validNickname(request.resource.data.nickname)
+        && validAvatarId(request.resource.data.profileImageId)
+        && request.resource.data.carBrand is string
+        && request.resource.data.carBrand.size() >= 1
+        && request.resource.data.carBrand.size() <= 32
+        && request.resource.data.carModel is string
+        && request.resource.data.carModel.size() >= 1
+        && request.resource.data.carModel.size() <= 32;
+
+      allow update: if isOwner(uid)
+        && validNickname(request.resource.data.nickname)
+        && validAvatarId(request.resource.data.profileImageId);
+
+      allow delete: if false;
+
+      // ---------------------------------------------------------------
+      // users/{uid}/records/{recordId} — 본인의 레이스 기록 히스토리
+      // ---------------------------------------------------------------
+      match /records/{recordId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && request.resource.data.timeMs is number
+          && request.resource.data.timeMs >= 30000;
+        allow update, delete: if false;
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // courses/{courseId} — 큐레이션된 코스. 클라이언트는 read-only.
+    // 시드 스크립트는 admin SDK로 우회 (보안 규칙 적용 안 됨).
+    // -----------------------------------------------------------------
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // -----------------------------------------------------------------
+    // rankings/{rankingId} — 모든 레이스 기록 (최상위 컬렉션).
+    // 본인 uid로만 create. update/delete 영구 금지.
+    // -----------------------------------------------------------------
+    match /rankings/{rankingId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.courseId is string
+        && request.resource.data.timeMs is number
+        && request.resource.data.timeMs >= 30000
+        && request.resource.data.averageKmh is number
+        && request.resource.data.averageKmh >= 0
+        && request.resource.data.averageKmh <= 200
+        && request.resource.data.flagged is bool
+        && validNickname(request.resource.data.nickname)
+        && validAvatarId(request.resource.data.profileImageId);
+
+      allow update, delete: if false;
+    }
+  }
+}

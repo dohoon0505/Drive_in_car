@@ -1,0 +1,83 @@
+# =============================================================================
+# Drive in Car — Combined .gitignore for Android (Kotlin) + iOS (Swift) + Firebase
+# =============================================================================
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------- Editors / IDEs ----------
+.idea/
+*.iml
+.vscode/
+.fleet/
+.cursor/
+*.swp
+*.swo
+*~
+
+# ---------- Android (Gradle / Kotlin) ----------
+android/.gradle/
+android/build/
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+android/local.properties
+android/**/build/
+android/**/local.properties
+android/app/release/
+android/app/debug/
+android/app/.cxx/
+
+# Keystore (never commit)
+*.jks
+*.keystore
+
+# ---------- iOS (Xcode / Swift) ----------
+ios/build/
+ios/DerivedData/
+ios/**/xcuserdata/
+ios/**/*.xcworkspace/xcuserdata/
+ios/**/*.xcodeproj/xcuserdata/
+ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Pods/
+ios/Podfile.lock
+ios/.swiftpm/
+
+# Carthage / SwiftPM caches
+ios/Carthage/Build/
+.build/
+.swiftpm/
+
+# ---------- Firebase secrets ----------
+# google-services.json / GoogleService-Info.plist are app-config files containing
+# project numbers + API keys. We treat them as secrets (gitignored) and rely on
+# every dev to download from Firebase Console.
+android/app/google-services.json
+ios/DriveInCar/Resources/GoogleService-Info.plist
+
+# Service account / admin credentials.
+firebase/serviceAccountKey.json
+firebase/.runtimeconfig.json
+firebase/seed/.env
+
+# Firebase emulator data
+firebase/emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ---------- Node (seed scripts) ----------
+node_modules/
+firebase/seed/dist/
+firebase/seed/.tsbuildinfo
+.npm
+.eslintcache
+
+# ---------- Logs / temp ----------
+*.log
+tmp/
+.tmp/

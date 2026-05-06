@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Drive in Car</string>
+
+    <!-- Login -->
+    <string name="login_title">Drive in Car</string>
+    <string name="login_subtitle">와인딩의 모든 순간을 기록하세요</string>
+    <string name="login_google">Google로 시작</string>
+    <string name="login_naver">Naver로 시작</string>
+    <string name="login_kakao">Kakao로 시작</string>
+    <string name="login_email_or_signup">이메일로 로그인 / 회원가입</string>
+    <string name="login_temp_badge">임시</string>
+
+    <!-- Email/Password sheet -->
+    <string name="auth_email">이메일</string>
+    <string name="auth_password">비밀번호</string>
+    <string name="auth_signin">로그인</string>
+    <string name="auth_signup">회원가입</string>
+
+    <!-- Profile setup -->
+    <string name="profile_setup_title">프로필 설정</string>
+    <string name="profile_setup_nickname">닉네임</string>
+    <string name="profile_setup_nickname_hint">2~16자</string>
+    <string name="profile_setup_brand">브랜드</string>
+    <string name="profile_setup_model">모델</string>
+    <string name="profile_setup_avatar">아바타</string>
+    <string name="profile_setup_save">저장</string>
+
+    <!-- Map -->
+    <string name="map_title">지도</string>
+    <string name="map_my_location">내 위치</string>
+
+    <!-- Course detail -->
+    <string name="course_join_race">랭킹전 참여</string>
+    <string name="course_info">참여 안내</string>
+    <string name="course_full_ranking">전체 랭킹</string>
+    <string name="course_distance">거리</string>
+    <string name="course_difficulty">난이도</string>
+    <string name="course_top3">Top 3</string>
+    <string name="course_no_records">아직 기록이 없습니다</string>
+    <string name="course_too_far">출발 지점으로 이동해주세요</string>
+
+    <!-- Race -->
+    <string name="race_arming">출발 지점으로 이동 중…</string>
+    <string name="race_armed_countdown">출발선 위에서 잠시 대기</string>
+    <string name="race_in_progress">레이스 진행 중</string>
+    <string name="race_cancel">중단</string>
+    <string name="race_remaining">남은 거리</string>
+    <string name="race_speed">현재 속도</string>
+
+    <!-- Result -->
+    <string name="result_title">결과</string>
+    <string name="result_personal_best">베스트 갱신!</string>
+    <string name="result_view_ranking">랭킹 보기</string>
+    <string name="result_retry">다시 도전</string>
+    <string name="result_back_to_map">지도로</string>
+
+    <!-- Logout -->
+    <string name="action_logout">로그아웃</string>
+</resources>

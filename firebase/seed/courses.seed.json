@@ -1,0 +1,120 @@
+[
+  {
+    "courseId": "hangyeryeong",
+    "name": "한계령 코스",
+    "description": "강원도 인제와 양양을 잇는 대표 와인딩 명소. 설악산을 끼고 도는 굽이굽이 산길로 가을 단풍철에 특히 인기가 많다. 노면 상태가 좋고 코너가 깊은 편이라 차의 진면목을 즐기기에 적합.",
+    "regionName": "강원도 인제군 - 양양군",
+    "startCoord": { "lat": 38.117417, "lng": 128.378222 },
+    "endCoord":   { "lat": 38.099500, "lng": 128.435611 },
+    "waypoints": [
+      { "lat": 38.117417, "lng": 128.378222, "order": 0 },
+      { "lat": 38.115200, "lng": 128.385900, "order": 1 },
+      { "lat": 38.111800, "lng": 128.394300, "order": 2 },
+      { "lat": 38.108200, "lng": 128.402700, "order": 3 },
+      { "lat": 38.104500, "lng": 128.411600, "order": 4 },
+      { "lat": 38.101800, "lng": 128.420400, "order": 5 },
+      { "lat": 38.100400, "lng": 128.428900, "order": 6 },
+      { "lat": 38.099500, "lng": 128.435611, "order": 7 }
+    ],
+    "distanceMeters": 6800,
+    "difficulty": 4,
+    "isActive": true
+  },
+  {
+    "courseId": "misiryeong",
+    "name": "미시령 옛길",
+    "description": "터널이 뚫리기 전 강원도 동서를 잇던 고갯길. 현재는 차량 통행이 적어 한적하게 와인딩을 즐길 수 있다. 짧지만 헤어핀이 연속되는 기술 코스.",
+    "regionName": "강원도 인제군 - 고성군",
+    "startCoord": { "lat": 38.213889, "lng": 128.430278 },
+    "endCoord":   { "lat": 38.226111, "lng": 128.474722 },
+    "waypoints": [
+      { "lat": 38.213889, "lng": 128.430278, "order": 0 },
+      { "lat": 38.215600, "lng": 128.438500, "order": 1 },
+      { "lat": 38.218300, "lng": 128.446800, "order": 2 },
+      { "lat": 38.220900, "lng": 128.455100, "order": 3 },
+      { "lat": 38.223400, "lng": 128.463900, "order": 4 },
+      { "lat": 38.225100, "lng": 128.470200, "order": 5 },
+      { "lat": 38.226111, "lng": 128.474722, "order": 6 }
+    ],
+    "distanceMeters": 5400,
+    "difficulty": 4,
+    "isActive": true
+  },
+  {
+    "courseId": "jeongnyeongchi",
+    "name": "정령치 코스",
+    "description": "지리산 자락을 가로지르는 고갯길. 해발 1172m로 한국에서 가장 높은 도로 중 하나. 시야가 트이는 구간이 많아 풍경과 드라이빙을 동시에 즐길 수 있다.",
+    "regionName": "전라북도 남원시",
+    "startCoord": { "lat": 35.371944, "lng": 127.546111 },
+    "endCoord":   { "lat": 35.397500, "lng": 127.587222 },
+    "waypoints": [
+      { "lat": 35.371944, "lng": 127.546111, "order": 0 },
+      { "lat": 35.376200, "lng": 127.553400, "order": 1 },
+      { "lat": 35.381100, "lng": 127.560800, "order": 2 },
+      { "lat": 35.385700, "lng": 127.568500, "order": 3 },
+      { "lat": 35.390300, "lng": 127.575900, "order": 4 },
+      { "lat": 35.394100, "lng": 127.582600, "order": 5 },
+      { "lat": 35.397500, "lng": 127.587222, "order": 6 }
+    ],
+    "distanceMeters": 9200,
+    "difficulty": 5,
+    "isActive": true
+  },
+  {
+    "courseId": "domaryeong",
+    "name": "도마령 코스",
+    "description": "충북 영동에서 영동으로 이어지는 고갯길. 좁은 2차선 도로지만 노면이 양호하고 코너 시퀀스가 리드미컬해서 와인딩 입문자에게도 추천.",
+    "regionName": "충청북도 영동군",
+    "startCoord": { "lat": 36.140833, "lng": 127.852500 },
+    "endCoord":   { "lat": 36.158889, "lng": 127.895833 },
+    "waypoints": [
+      { "lat": 36.140833, "lng": 127.852500, "order": 0 },
+      { "lat": 36.144900, "lng": 127.860700, "order": 1 },
+      { "lat": 36.148800, "lng": 127.869600, "order": 2 },
+      { "lat": 36.152400, "lng": 127.878400, "order": 3 },
+      { "lat": 36.155600, "lng": 127.887100, "order": 4 },
+      { "lat": 36.158889, "lng": 127.895833, "order": 5 }
+    ],
+    "distanceMeters": 5800,
+    "difficulty": 3,
+    "isActive": true
+  },
+  {
+    "courseId": "gatgogae",
+    "name": "갓고개",
+    "description": "경기 가평의 숨은 와인딩 명소. 서울 근교 운전자들이 주말마다 찾는 코스. 길이는 짧지만 코너가 다채로워 부담 없이 즐기기에 좋다.",
+    "regionName": "경기도 가평군",
+    "startCoord": { "lat": 37.829444, "lng": 127.532778 },
+    "endCoord":   { "lat": 37.851667, "lng": 127.555556 },
+    "waypoints": [
+      { "lat": 37.829444, "lng": 127.532778, "order": 0 },
+      { "lat": 37.834200, "lng": 127.538100, "order": 1 },
+      { "lat": 37.839500, "lng": 127.543700, "order": 2 },
+      { "lat": 37.844100, "lng": 127.548900, "order": 3 },
+      { "lat": 37.848300, "lng": 127.553200, "order": 4 },
+      { "lat": 37.851667, "lng": 127.555556, "order": 5 }
+    ],
+    "distanceMeters": 4200,
+    "difficulty": 2,
+    "isActive": true
+  },
+  {
+    "courseId": "yukshipnyeong",
+    "name": "육십령 코스",
+    "description": "경남과 전북을 잇는 백두대간 고갯길. 트럭 통행이 적은 새벽-오전 시간대 추천. 깊은 헤어핀과 길게 이어지는 직선 구간이 교차한다.",
+    "regionName": "전라북도 장수군 - 경상남도 함양군",
+    "startCoord": { "lat": 35.610556, "lng": 127.700278 },
+    "endCoord":   { "lat": 35.640000, "lng": 127.733889 },
+    "waypoints": [
+      { "lat": 35.610556, "lng": 127.700278, "order": 0 },
+      { "lat": 35.615900, "lng": 127.706800, "order": 1 },
+      { "lat": 35.621700, "lng": 127.713500, "order": 2 },
+      { "lat": 35.627800, "lng": 127.720200, "order": 3 },
+      { "lat": 35.633500, "lng": 127.727100, "order": 4 },
+      { "lat": 35.640000, "lng": 127.733889, "order": 5 }
+    ],
+    "distanceMeters": 7100,
+    "difficulty": 4,
+    "isActive": true
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "_comment": "TEMPLATE — Firebase Console (drive-3c0fd) → 프로젝트 설정 → 내 앱 → Android 앱 추가 → google-services.json 다운로드 → android/app/google-services.json 으로 저장. 이 파일은 양식 참고용이며 실제 빌드는 진짜 google-services.json 이 있어야 동작합니다.",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "drive-3c0fd",
+    "storage_bucket": "drive-3c0fd.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.driveincar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        { "current_key": "REPLACE_WITH_REAL_KEY" }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,37 @@
+# Default: normalize text files to LF in repo, OS-native in working tree.
+* text=auto
+
+# Shell scripts MUST stay LF on disk (bash chokes on CRLF).
+*.sh        text eol=lf
+gradlew     text eol=lf
+
+# Windows-only scripts must stay CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binaries — never touch.
+*.jar       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.gif       binary
+*.zip       binary
+*.keystore  binary
+*.jks       binary
+
+# Source files
+*.kt        text
+*.swift     text
+*.java      text
+*.xml       text
+*.gradle    text
+*.gradle.kts text
+*.toml      text
+*.properties text
+*.json      text
+*.md        text
+*.yml       text
+*.yaml      text
+*.rules     text
