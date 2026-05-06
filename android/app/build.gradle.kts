@@ -62,13 +62,15 @@ android {
     }
 }
 
-// Reads MAPS_API_KEY from local.properties (gitignored) and exposes it as
-// android.geo.API_KEY meta-data placeholder. local.properties는 Android Gradle의
-// 표준 시크릿 파일로, sdk.dir / MAPS_API_KEY 등을 한 군데에 두는 게 컨벤션이다.
+// secrets-gradle-plugin 이 local.properties 의 키들을 manifest 의 ${...} placeholder
+// 자리에 주입한다. 동시에 BuildConfig 필드로도 노출되어 코드에서 BuildConfig.MAPS_API_KEY
+// 처럼 읽을 수 있다 (Phase 2B 의 Roads API HTTP 호출용).
+//
+//  - NAVER_MAP_CLIENT_ID  → AndroidManifest 의 com.naver.maps.map.CLIENT_ID 메타에 주입
+//  - MAPS_API_KEY         → manifest 에는 더 이상 안 쓰이고 BuildConfig 로만 노출
 secrets {
     propertiesFileName = "local.properties"
     defaultPropertiesFileName = "local.defaults.properties"
-    // 키 값을 BuildConfig 에 절대 노출하지 않는다(보안).
     ignoreList.add("sdk.*")
 }
 
@@ -111,11 +113,10 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
 
-    // Maps / Location
-    implementation(libs.play.services.maps)
+    // Naver Maps SDK (지도 렌더링 전용) + Play Services Location (GPS).
+    // Google Maps SDK 는 더 이상 사용 안 함 — 좌표/거리 계산은 자체 도메인 LatLng + Geo helpers.
+    implementation(libs.naver.map.sdk)
     implementation(libs.play.services.location)
-    implementation(libs.maps.compose)
-    implementation(libs.maps.compose.utils)
 
     // Misc
     implementation(libs.accompanist.permissions)

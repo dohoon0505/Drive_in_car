@@ -17,6 +17,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Naver Maps SDK 는 별도 Maven 저장소를 사용 (Maven Central 에 미배포).
+        maven { url = uri("https://repository.map.naver.com/archive/maven") }
     }
 }
 

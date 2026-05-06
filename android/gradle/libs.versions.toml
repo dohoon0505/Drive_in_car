@@ -27,11 +27,12 @@ kotlinx-serialization     = "1.7.2"
 # Firebase
 firebase-bom              = "33.3.0"
 
-# Google services / maps
+# Google services / location (Maps SDK 는 사용 안 함, location 만 유지)
 google-services           = "4.4.2"
-play-services-maps        = "19.0.0"
 play-services-location    = "21.3.0"
-maps-compose              = "4.4.1"
+
+# Naver Maps SDK (지도 렌더링 전용. 좌표 계산은 자체 도메인 LatLng + Google Roads API)
+naver-map-sdk             = "3.23.2"
 
 # Other
 accompanist-permissions   = "0.36.0"
@@ -86,11 +87,9 @@ firebase-firestore                = { group = "com.google.firebase",           n
 firebase-storage                  = { group = "com.google.firebase",           name = "firebase-storage-ktx" }
 firebase-crashlytics              = { group = "com.google.firebase",           name = "firebase-crashlytics-ktx" }
 
-# Maps / Location
-play-services-maps                = { group = "com.google.android.gms",        name = "play-services-maps",        version.ref = "play-services-maps" }
+# Location (Google Play Services) + Naver Maps SDK (rendering)
 play-services-location            = { group = "com.google.android.gms",        name = "play-services-location",    version.ref = "play-services-location" }
-maps-compose                      = { group = "com.google.maps.android",       name = "maps-compose",              version.ref = "maps-compose" }
-maps-compose-utils                = { group = "com.google.maps.android",       name = "maps-compose-utils",        version.ref = "maps-compose" }
+naver-map-sdk                     = { group = "com.naver.maps",                name = "map-sdk",                   version.ref = "naver-map-sdk" }
 
 # Misc
 accompanist-permissions           = { group = "com.google.accompanist",        name = "accompanist-permissions",   version.ref = "accompanist-permissions" }

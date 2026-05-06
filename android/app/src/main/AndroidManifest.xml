@@ -47,10 +47,11 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Google Maps API key (secrets-gradle-plugin에서 주입) -->
+        <!-- Naver Maps SDK Client ID (secrets-gradle-plugin 이 local.properties 에서 주입).
+             패키지명 com.driveincar 가 NCP Console 에 등록되어 있으면 SDK 가 검증 통과. -->
         <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
+            android:name="com.naver.maps.map.CLIENT_ID"
+            android:value="${NAVER_MAP_CLIENT_ID}" />
 
     </application>
 </manifest>

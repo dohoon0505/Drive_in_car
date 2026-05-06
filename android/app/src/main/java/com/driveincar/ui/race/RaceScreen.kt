@@ -21,9 +21,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,25 +44,21 @@ import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.domain.race.RaceState
 import com.driveincar.ui.components.Overline
-import com.driveincar.ui.map.MAP_STYLE_DARK_JSON
-import com.driveincar.ui.map.rememberMarkerIcon
+import com.driveincar.ui.map.NaverMapBox
+import com.driveincar.ui.map.rememberOverlayImage
+import com.driveincar.ui.map.toNaver
+import com.driveincar.ui.map.toNaverArgb
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.JointType
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.android.gms.maps.model.RoundCap
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.naver.maps.geometry.LatLng as NaverLatLng
+import com.naver.maps.map.CameraPosition
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.Overlay
+import com.naver.maps.map.overlay.PathOverlay
 import com.driveincar.domain.model.LatLng as DomainLatLng
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -121,7 +120,7 @@ fun RaceScreen(
             }
         }
 
-        // 미니맵: 코스 라인(반투명) + 라이브 궤적(전경) + 현재 위치 마커
+        // 미니맵: 코스 라인(반투명) + 라이브 궤적(전경) + 출발/도착/현재 마커
         course?.let { c ->
             RaceMiniMap(
                 course = c,
@@ -137,7 +136,7 @@ fun RaceScreen(
             )
         }
 
-        // Center-bottom: lap clock + metrics (미니맵 아래로 자연스럽게 내림)
+        // Lap clock + metrics
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -193,11 +192,7 @@ fun RaceScreen(
                     }
                 }
                 is RaceState.Finished, is RaceState.Cancelled -> {
-                    Text(
-                        "처리 중…",
-                        color = ApexColors.TextSec,
-                        fontFamily = Pretendard,
-                    )
+                    Text("처리 중…", color = ApexColors.TextSec, fontFamily = Pretendard)
                 }
             }
         }
@@ -238,73 +233,97 @@ private fun RaceMiniMap(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    val mapStyle = remember { MapStyleOptions(MAP_STYLE_DARK_JSON) }
-    val cameraState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            LatLng(course.startCoord.lat, course.startCoord.lng),
-            13f,
-        )
-    }
-    val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 30)
-    val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 26)
+    val startIcon = rememberOverlayImage(R.drawable.ic_marker_start, sizeDp = 30)
+    val finishIcon = rememberOverlayImage(R.drawable.ic_marker_finish, sizeDp = 26)
 
-    GoogleMap(
+    var naverMap by remember { mutableStateOf<NaverMap?>(null) }
+
+    NaverMapBox(
         modifier = modifier,
-        cameraPositionState = cameraState,
-        properties = MapProperties(mapStyleOptions = mapStyle),
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            myLocationButtonEnabled = false,
-            mapToolbarEnabled = false,
-            compassEnabled = false,
-            scrollGesturesEnabled = false,
-            zoomGesturesEnabled = false,
-            tiltGesturesEnabled = false,
-            rotationGesturesEnabled = false,
-        ),
-    ) {
-        // 코스 라인 (반투명 배경)
-        val coursePts = course.toLatLngList().map { LatLng(it.lat, it.lng) }
-        Polyline(
-            points = coursePts,
-            color = accent.copy(alpha = 0.4f),
-            width = 8f,
-            jointType = JointType.ROUND,
-            startCap = RoundCap(),
-            endCap = RoundCap(),
-            zIndex = 1f,
-        )
-        // 라이브 궤적 (전경, 두꺼운 라인)
-        if (track.size >= 2) {
-            Polyline(
-                points = track.map { LatLng(it.lat, it.lng) },
-                color = accent,
-                width = 12f,
-                jointType = JointType.ROUND,
-                startCap = RoundCap(),
-                endCap = RoundCap(),
-                zIndex = 2f,
+        onMapReady = { map ->
+            naverMap = map
+            map.cameraPosition = CameraPosition(
+                NaverLatLng(course.startCoord.lat, course.startCoord.lng),
+                13.0,
             )
+            map.uiSettings.apply {
+                isCompassEnabled = false
+                isScaleBarEnabled = false
+                isZoomControlEnabled = false
+                isLocationButtonEnabled = false
+                isLogoClickEnabled = false
+                isScrollGesturesEnabled = false
+                isZoomGesturesEnabled = false
+                isTiltGesturesEnabled = false
+                isRotateGesturesEnabled = false
+            }
+        },
+    )
+
+    // 코스 폴리라인 (정적), 라이브 트랙(동적) 을 분리해서 갱신.
+    val staticOverlays = remember { mutableListOf<Overlay>() }
+    DisposableEffect(naverMap, course) {
+        val map = naverMap
+        staticOverlays.forEach { it.map = null }
+        staticOverlays.clear()
+
+        if (map != null) {
+            // 코스 폴리라인 (반투명 배경)
+            val coursePts = course.toLatLngList().toNaver()
+            val coursePath = PathOverlay().apply {
+                coords = coursePts
+                color = accent.copy(alpha = 0.4f).toNaverArgb()
+                width = 16  // px
+                outlineWidth = 0
+            }
+            coursePath.map = map
+            staticOverlays.add(coursePath)
+
+            // 출발/도착 마커
+            val startMarker = Marker().apply {
+                position = NaverLatLng(course.startCoord.lat, course.startCoord.lng)
+                icon = startIcon
+            }
+            startMarker.map = map
+            staticOverlays.add(startMarker)
+
+            val endMarker = Marker().apply {
+                position = NaverLatLng(course.endCoord.lat, course.endCoord.lng)
+                icon = finishIcon
+            }
+            endMarker.map = map
+            staticOverlays.add(endMarker)
         }
-        // 출발/도착 — 커스텀 ▶/체커 마커
-        Marker(
-            state = MarkerState(coursePts.first()),
-            title = "출발",
-            icon = startIcon,
-            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-        )
-        Marker(
-            state = MarkerState(coursePts.last()),
-            title = "도착",
-            icon = finishIcon,
-            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-        )
-        // 현재 위치 마커 (시스템 기본 — 자기 위치는 명확히 구분)
+
+        onDispose {
+            staticOverlays.forEach { it.map = null }
+            staticOverlays.clear()
+        }
+    }
+
+    // 라이브 트랙 + 현재 위치 — 매 샘플마다 갱신
+    val livePath = remember { PathOverlay() }
+    val liveMarker = remember { Marker() }
+    DisposableEffect(naverMap) {
+        onDispose {
+            livePath.map = null
+            liveMarker.map = null
+        }
+    }
+    LaunchedEffect(naverMap, track, accent) {
+        val map = naverMap ?: return@LaunchedEffect
+        if (track.size >= 2) {
+            livePath.coords = track.toNaver()
+            livePath.color = accent.toNaverArgb()
+            livePath.width = 22
+            livePath.outlineWidth = 0
+            if (livePath.map == null) livePath.map = map
+        }
         track.lastOrNull()?.let { last ->
-            Marker(
-                state = MarkerState(LatLng(last.lat, last.lng)),
-                title = "지금 위치",
-            )
+            liveMarker.position = last.toNaver()
+            liveMarker.captionText = "지금"
+            liveMarker.captionColor = ApexColors.Text.toNaverArgb()
+            if (liveMarker.map == null) liveMarker.map = map
         }
     }
 }

@@ -2,7 +2,6 @@ package com.driveincar.ui.map
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -26,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,11 +33,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.driveincar.R
 import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.ui.components.InitialBadge
@@ -46,19 +47,12 @@ import com.driveincar.ui.components.Overline
 import com.driveincar.ui.components.PrimaryButton
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.driveincar.R
-import com.google.android.gms.maps.model.JointType
-import com.google.android.gms.maps.model.RoundCap
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.naver.maps.geometry.LatLng as NaverLatLng
+import com.naver.maps.map.CameraPosition
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.Overlay
+import com.naver.maps.map.overlay.PathOverlay
 import kotlinx.coroutines.delay
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -71,18 +65,13 @@ fun MapScreen(
     val courses by vm.courses.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
 
-    val cameraState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(36.5, 127.8), 6.5f)
-    }
     var focusedCourseId by remember { mutableStateOf<String?>(null) }
     val focusedCourse: Course? = remember(focusedCourseId, courses) {
         focusedCourseId?.let { id -> courses.firstOrNull { it.courseId == id } }
             ?: courses.firstOrNull()
     }
 
-    val mapStyle = remember { MapStyleOptions(MAP_STYLE_DARK_JSON) }
-
-    // 맵 로드 상태: 8초 안에 onMapLoaded 가 안 떨어지면 Cloud Console 안내 배너 표시.
+    // 8초 안에 onMapLoaded 안 떨어지면 Cloud / NCP Console 안내 배너.
     var mapLoaded by remember { mutableStateOf(false) }
     var showLoadHint by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -90,69 +79,40 @@ fun MapScreen(
         if (!mapLoaded) showLoadHint = true
     }
 
-    val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 36)
-    val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 32)
+    val startIcon = rememberOverlayImage(R.drawable.ic_marker_start, sizeDp = 36)
+    val finishIcon = rememberOverlayImage(R.drawable.ic_marker_finish, sizeDp = 32)
+
+    var naverMap by remember { mutableStateOf<NaverMap?>(null) }
 
     Box(modifier = Modifier
         .fillMaxSize()
         .background(ApexColors.Bg)
     ) {
-        GoogleMap(
+        NaverMapBox(
             modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraState,
-            properties = MapProperties(mapStyleOptions = mapStyle),
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false,
-                mapToolbarEnabled = false,
-                compassEnabled = false,
-            ),
+            onMapReady = { map ->
+                naverMap = map
+                map.cameraPosition = CameraPosition(NaverLatLng(36.5, 127.8), 6.5)
+                // 어떤 UI 컨트롤도 안 보이게 (글래스 오버레이가 따로 있음)
+                map.uiSettings.apply {
+                    isCompassEnabled = false
+                    isScaleBarEnabled = false
+                    isZoomControlEnabled = false
+                    isLocationButtonEnabled = false
+                    isLogoClickEnabled = false
+                }
+            },
             onMapLoaded = { mapLoaded = true },
-        ) {
-            for (c in courses) {
-                val accent = ApexColors.accentFor(c.courseId)
-                val pts = c.toLatLngList().map { LatLng(it.lat, it.lng) }
-                // 코스 폴리라인 — 액센트 색으로 한반도 위에 빛난다
-                Polyline(
-                    points = pts,
-                    color = accent.copy(alpha = 0.85f),
-                    width = 6f,
-                    jointType = JointType.ROUND,
-                    startCap = RoundCap(),
-                    endCap = RoundCap(),
-                    zIndex = 1f,
-                )
-                // 출발점 — 탭 가능, 코스 카드 트리거. 커스텀 ▶ 마커.
-                Marker(
-                    state = MarkerState(LatLng(c.startCoord.lat, c.startCoord.lng)),
-                    title = c.name,
-                    snippet = c.regionName,
-                    icon = startIcon,
-                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-                    onClick = {
-                        focusedCourseId = c.courseId
-                        true
-                    }
-                )
-                // 도착점 — 체커 패턴 마커
-                Marker(
-                    state = MarkerState(LatLng(c.endCoord.lat, c.endCoord.lng)),
-                    title = "${c.name} (도착)",
-                    icon = finishIcon,
-                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-                    alpha = 0.85f,
-                )
-            }
-        }
+        )
 
-        // 맵 타일 로드 실패 진단 배너 — 사용자가 아무것도 안 보일 때 명확한 다음 단계 안내
-        if (showLoadHint && !mapLoaded) {
-            MapLoadFailureBanner(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 24.dp)
-            )
-        }
+        // 코스 마커 + 폴리라인 — courses / naverMap 변화에 따라 갱신
+        CourseOverlays(
+            naverMap = naverMap,
+            courses = courses,
+            startIcon = startIcon,
+            finishIcon = finishIcon,
+            onMarkerClick = { focusedCourseId = it },
+        )
 
         // 상단 검색바 + 프로필 칩
         Row(
@@ -174,12 +134,18 @@ fun MapScreen(
             )
         }
 
-        // 빈 코스일 때 안내
         if (courses.isEmpty()) {
             EmptyHint(modifier = Modifier.align(Alignment.Center))
         }
 
-        // 하단 코스 peek 카드
+        if (showLoadHint && !mapLoaded) {
+            MapLoadFailureBanner(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+            )
+        }
+
         focusedCourse?.let { c ->
             CoursePeekCard(
                 course = c,
@@ -188,6 +154,75 @@ fun MapScreen(
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 12.dp, vertical = 24.dp),
             )
+        }
+    }
+}
+
+/**
+ * courses 리스트 / naverMap 변경 시 폴리라인 + 마커를 모두 재구성.
+ * 각 overlay 의 .map 을 null 로 두어 정리, 새로 set.
+ * remember 로 overlay 들을 보관해서 다음 갱신 때 정리할 수 있게 함.
+ */
+@Composable
+private fun CourseOverlays(
+    naverMap: NaverMap?,
+    courses: List<Course>,
+    startIcon: com.naver.maps.map.overlay.OverlayImage,
+    finishIcon: com.naver.maps.map.overlay.OverlayImage,
+    onMarkerClick: (String) -> Unit,
+) {
+    val overlays = remember { mutableListOf<Overlay>() }
+
+    DisposableEffect(naverMap, courses) {
+        val map = naverMap
+        // 이전 overlay 정리
+        overlays.forEach { it.map = null }
+        overlays.clear()
+
+        if (map != null) {
+            for (c in courses) {
+                val accent = ApexColors.accentFor(c.courseId)
+                val pts = c.toLatLngList().toNaver()
+
+                // 코스 폴리라인
+                val path = PathOverlay().apply {
+                    coords = pts
+                    color = accent.copy(alpha = 0.85f).toNaverArgb()
+                    width = 18  // px
+                    outlineWidth = 0
+                }
+                path.map = map
+                overlays.add(path)
+
+                // 출발 마커 (▶) — OverlayImage 의 natural size (Marker.SIZE_AUTO) 사용
+                val startMarker = Marker().apply {
+                    position = NaverLatLng(c.startCoord.lat, c.startCoord.lng)
+                    icon = startIcon
+                    captionText = c.name
+                    captionColor = ApexColors.Text.toNaverArgb()
+                    captionHaloColor = ApexColors.Bg.copy(alpha = 0.7f).toNaverArgb()
+                    onClickListener = Overlay.OnClickListener {
+                        onMarkerClick(c.courseId)
+                        true
+                    }
+                }
+                startMarker.map = map
+                overlays.add(startMarker)
+
+                // 도착 마커 (체커)
+                val endMarker = Marker().apply {
+                    position = NaverLatLng(c.endCoord.lat, c.endCoord.lng)
+                    icon = finishIcon
+                    alpha = 0.85f
+                }
+                endMarker.map = map
+                overlays.add(endMarker)
+            }
+        }
+
+        onDispose {
+            overlays.forEach { it.map = null }
+            overlays.clear()
         }
     }
 }
@@ -263,15 +298,15 @@ private fun MapLoadFailureBanner(modifier: Modifier = Modifier) {
             "지도 타일이 안 받아져요",
             color = ApexColors.Text,
             fontSize = 16.sp,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontWeight = FontWeight.Bold,
             fontFamily = Pretendard,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Google Cloud Console 에서:\n" +
-                "1. Maps SDK for Android 활성화\n" +
-                "2. 결제 계정 연결 (월 \$200 무료)\n" +
-                "3. API 키에 패키지명 + SHA-1 제한",
+            "Naver Cloud Platform Console 에서:\n" +
+                "1. Maps Mobile Dynamic Map 활성화\n" +
+                "2. Application 의 Android 패키지명에 com.driveincar 등록\n" +
+                "3. Client ID 가 local.properties 의 NAVER_MAP_CLIENT_ID 와 일치하는지 확인",
             color = ApexColors.TextSec,
             fontSize = 13.sp,
             fontFamily = Pretendard,
@@ -329,7 +364,6 @@ private fun CoursePeekCard(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                // 산 모양 단순화 (Lucide-style mountain 아이콘 자리에 글리프)
                 Text("⛰", fontSize = 24.sp, color = ApexColors.Bg)
             }
             Column(modifier = Modifier.weight(1f)) {

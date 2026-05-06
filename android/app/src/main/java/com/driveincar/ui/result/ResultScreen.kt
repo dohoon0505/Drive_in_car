@@ -22,8 +22,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,27 +44,23 @@ import com.driveincar.core.time.TimeFormat
 import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.ui.components.Overline
-import com.driveincar.ui.map.rememberMarkerIcon
 import com.driveincar.ui.components.PrimaryButton
 import com.driveincar.ui.components.SecondaryButton
-import com.driveincar.ui.map.MAP_STYLE_DARK_JSON
-import com.driveincar.ui.theme.ApexColors
-import com.driveincar.ui.theme.Pretendard
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.JointType
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.android.gms.maps.model.RoundCap
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapEffect
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.driveincar.ui.map.NaverMapBox
+import com.driveincar.ui.map.boundsOf
+import com.driveincar.ui.map.rememberOverlayImage
+import com.driveincar.ui.map.toNaver
+import com.driveincar.ui.map.toNaverArgb
+import com.naver.maps.geometry.LatLng as NaverLatLng
+import com.naver.maps.map.CameraAnimation
+import com.naver.maps.map.CameraPosition
+import com.naver.maps.map.CameraUpdate
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.Overlay
+import com.naver.maps.map.overlay.PathOverlay
 import com.driveincar.domain.model.LatLng as DomainLatLng
+import com.driveincar.ui.theme.ApexColors
 
 @Composable
 fun ResultScreen(
@@ -111,7 +110,7 @@ fun ResultScreen(
             color = ApexColors.Text,
             fontSize = 32.sp,
             fontWeight = FontWeight.ExtraBold,
-            fontFamily = Pretendard,
+            fontFamily = com.driveincar.ui.theme.Pretendard,
             letterSpacing = (-0.030).em,
         )
         if (flagged) {
@@ -126,14 +125,13 @@ fun ResultScreen(
                     text = "비정상 평균 속도로 리더보드에서 제외됐어요",
                     color = ApexColors.Red,
                     fontSize = 12.sp,
-                    fontFamily = Pretendard,
+                    fontFamily = com.driveincar.ui.theme.Pretendard,
                 )
             }
         }
 
         Spacer(Modifier.height(20.dp))
 
-        // 완주 궤적 미니맵 — 코스 라인 + 본인이 달린 길
         course?.let { c ->
             FinishedTrackMap(
                 course = c,
@@ -164,7 +162,7 @@ fun ResultScreen(
                 color = ApexColors.Text,
                 fontSize = 56.sp,
                 fontWeight = FontWeight.Black,
-                fontFamily = Pretendard,
+                fontFamily = com.driveincar.ui.theme.Pretendard,
                 letterSpacing = (-0.04).em,
             )
             Spacer(Modifier.height(16.dp))
@@ -232,85 +230,96 @@ private fun FinishedTrackMap(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    val mapStyle = remember { MapStyleOptions(MAP_STYLE_DARK_JSON) }
-    val coursePts = remember(course) {
-        course.toLatLngList().map { LatLng(it.lat, it.lng) }
-    }
-    val trackPts = remember(track) {
-        track.map { LatLng(it.lat, it.lng) }
-    }
+    val startIcon = rememberOverlayImage(R.drawable.ic_marker_start, sizeDp = 32)
+    val finishIcon = rememberOverlayImage(R.drawable.ic_marker_finish, sizeDp = 28)
 
-    val cameraState = rememberCameraPositionState {
-        position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(
-            LatLng(course.startCoord.lat, course.startCoord.lng),
-            13f,
-        )
-    }
+    var naverMap by remember { mutableStateOf<NaverMap?>(null) }
 
-    GoogleMap(
+    NaverMapBox(
         modifier = modifier,
-        cameraPositionState = cameraState,
-        properties = MapProperties(mapStyleOptions = mapStyle),
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            myLocationButtonEnabled = false,
-            mapToolbarEnabled = false,
-            compassEnabled = false,
-            scrollGesturesEnabled = false,
-            zoomGesturesEnabled = false,
-            tiltGesturesEnabled = false,
-            rotationGesturesEnabled = false,
-        ),
-    ) {
-        // 카메라를 코스 + 트랙 모두 들어오도록 fit
-        MapEffect(coursePts, trackPts) { map ->
-            val builder = LatLngBounds.builder()
-            coursePts.forEach(builder::include)
-            trackPts.forEach(builder::include)
-            try {
-                map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 80))
-            } catch (_: IllegalStateException) {
-                // bounds 가 비어있으면 무시 (track 이 0이고 coursePts 가 1개 이하인 케이스)
+        onMapReady = { map ->
+            naverMap = map
+            map.cameraPosition = CameraPosition(
+                NaverLatLng(course.startCoord.lat, course.startCoord.lng),
+                13.0,
+            )
+            map.uiSettings.apply {
+                isCompassEnabled = false
+                isScaleBarEnabled = false
+                isZoomControlEnabled = false
+                isLocationButtonEnabled = false
+                isLogoClickEnabled = false
+                isScrollGesturesEnabled = false
+                isZoomGesturesEnabled = false
+                isTiltGesturesEnabled = false
+                isRotateGesturesEnabled = false
+            }
+        },
+    )
+
+    val overlays = remember { mutableListOf<Overlay>() }
+    DisposableEffect(naverMap, course, track) {
+        val map = naverMap
+        overlays.forEach { it.map = null }
+        overlays.clear()
+
+        if (map != null) {
+            val coursePts = course.toLatLngList()
+            val coursePtsNaver = coursePts.toNaver()
+
+            // 코스 라인 (얇고 반투명)
+            val coursePath = PathOverlay().apply {
+                coords = coursePtsNaver
+                color = accent.copy(alpha = 0.4f).toNaverArgb()
+                width = 12
+                outlineWidth = 0
+            }
+            coursePath.map = map
+            overlays.add(coursePath)
+
+            // 본인 완주 궤적 (두꺼운 solid)
+            if (track.size >= 2) {
+                val trackPath = PathOverlay().apply {
+                    coords = track.toNaver()
+                    color = accent.toNaverArgb()
+                    width = 22
+                    outlineWidth = 0
+                }
+                trackPath.map = map
+                overlays.add(trackPath)
+            }
+
+            // 출발/도착 마커
+            val startMarker = Marker().apply {
+                position = NaverLatLng(course.startCoord.lat, course.startCoord.lng)
+                icon = startIcon
+            }
+            startMarker.map = map
+            overlays.add(startMarker)
+
+            val endMarker = Marker().apply {
+                position = NaverLatLng(course.endCoord.lat, course.endCoord.lng)
+                icon = finishIcon
+            }
+            endMarker.map = map
+            overlays.add(endMarker)
+
+            // 카메라를 코스 + 트랙 모두 들어오게 fit
+            val bounds = boundsOf(coursePts, track)
+            if (bounds != null) {
+                runCatching {
+                    map.moveCamera(
+                        CameraUpdate.fitBounds(bounds, /* padding px = */ 80)
+                            .animate(CameraAnimation.None)
+                    )
+                }
             }
         }
 
-        // 코스 라인 (얇고 반투명)
-        Polyline(
-            points = coursePts,
-            color = accent.copy(alpha = 0.4f),
-            width = 6f,
-            jointType = JointType.ROUND,
-            startCap = RoundCap(),
-            endCap = RoundCap(),
-            zIndex = 1f,
-        )
-        // 본인 완주 궤적 (두꺼운 solid)
-        if (trackPts.size >= 2) {
-            Polyline(
-                points = trackPts,
-                color = accent,
-                width = 12f,
-                jointType = JointType.ROUND,
-                startCap = RoundCap(),
-                endCap = RoundCap(),
-                zIndex = 2f,
-            )
+        onDispose {
+            overlays.forEach { it.map = null }
+            overlays.clear()
         }
-        // 출발/도착 커스텀 마커
-        val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 32)
-        val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 28)
-        Marker(
-            state = MarkerState(coursePts.first()),
-            title = "출발",
-            icon = startIcon,
-            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-        )
-        Marker(
-            state = MarkerState(coursePts.last()),
-            title = "도착",
-            icon = finishIcon,
-            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
-        )
     }
 }
 
@@ -334,14 +343,14 @@ private fun ResultStat(
                 color = color,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = Pretendard,
+                fontFamily = com.driveincar.ui.theme.Pretendard,
             )
             if (unit.isNotEmpty()) {
                 Text(
                     text = unit,
                     color = ApexColors.TextSec,
                     fontSize = 11.sp,
-                    fontFamily = Pretendard,
+                    fontFamily = com.driveincar.ui.theme.Pretendard,
                     modifier = Modifier.padding(bottom = 3.dp),
                 )
             }
