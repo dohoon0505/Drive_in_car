@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.driveincar.domain.model.Course
+import com.driveincar.domain.model.toLatLngList
 import com.driveincar.ui.components.InitialBadge
 import com.driveincar.ui.components.Overline
 import com.driveincar.ui.components.PrimaryButton
@@ -46,11 +47,14 @@ import com.driveincar.ui.theme.Pretendard
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.JointType
+import com.google.android.gms.maps.model.RoundCap
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -90,6 +94,19 @@ fun MapScreen(
             ),
         ) {
             for (c in courses) {
+                val accent = ApexColors.accentFor(c.courseId)
+                val pts = c.toLatLngList().map { LatLng(it.lat, it.lng) }
+                // 코스 폴리라인 — 액센트 색으로 한반도 위에 빛난다
+                Polyline(
+                    points = pts,
+                    color = accent.copy(alpha = 0.85f),
+                    width = 6f,
+                    jointType = JointType.ROUND,
+                    startCap = RoundCap(),
+                    endCap = RoundCap(),
+                    zIndex = 1f,
+                )
+                // 출발점 — 탭 가능, 코스 카드 트리거
                 Marker(
                     state = MarkerState(LatLng(c.startCoord.lat, c.startCoord.lng)),
                     title = c.name,
@@ -98,6 +115,12 @@ fun MapScreen(
                         focusedCourseId = c.courseId
                         true
                     }
+                )
+                // 도착점 — 라인의 양 끝을 명확히 하기 위한 보조 마커
+                Marker(
+                    state = MarkerState(LatLng(c.endCoord.lat, c.endCoord.lng)),
+                    title = "${c.name} (도착)",
+                    alpha = 0.7f,
                 )
             }
         }

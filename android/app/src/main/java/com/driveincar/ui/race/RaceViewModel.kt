@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.driveincar.data.auth.AuthRepository
 import com.driveincar.data.course.CourseRepository
 import com.driveincar.data.location.LocationProvider
+import com.driveincar.data.race.LastRaceTrackHolder
 import com.driveincar.data.ranking.RankingRepository
 import com.driveincar.data.user.UserRepository
 import com.driveincar.domain.model.Course
+import com.driveincar.domain.model.LatLng
 import com.driveincar.domain.race.CancelReason
 import com.driveincar.domain.race.RaceConfig
 import com.driveincar.domain.race.RaceState
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -44,6 +47,7 @@ class RaceViewModel @Inject constructor(
     private val users: UserRepository,
     private val rankings: RankingRepository,
     private val submit: SubmitTimeUseCase,
+    private val trackHolder: LastRaceTrackHolder,
 ) : ViewModel() {
 
     private val courseId: String = savedState["courseId"] ?: ""
@@ -53,6 +57,13 @@ class RaceViewModel @Inject constructor(
 
     private val _course = MutableStateFlow<Course?>(null)
     val course: StateFlow<Course?> = _course.asStateFlow()
+
+    /**
+     * InRace 진입 이후 누적된 GPS 좌표. 미니맵의 라이브 폴리라인 + Result 의
+     * 완주 궤적 표시에 쓰인다. Arming/Armed 단계의 샘플은 노이즈로 간주해 제외.
+     */
+    private val _track = MutableStateFlow<List<LatLng>>(emptyList())
+    val track: StateFlow<List<LatLng>> = _track.asStateFlow()
 
     private val _events = MutableSharedFlow<RaceEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<RaceEvent> = _events.asSharedFlow()
@@ -76,6 +87,13 @@ class RaceViewModel @Inject constructor(
                 val m = machine ?: return@collect
                 val newState = m.onSample(sample)
                 _state.value = newState
+
+                // InRace 동안 또는 InRace → Finished 직전 샘플까지 누적.
+                // (Finished 샘플은 도착선 통과 직후라 trace 마지막 점으로 의미 있음.)
+                if (newState is RaceState.InRace || newState is RaceState.Finished) {
+                    _track.update { it + sample.coord }
+                }
+
                 when (newState) {
                     is RaceState.Finished -> handleFinish(newState)
                     is RaceState.Cancelled -> handleCancel(newState.reason)
@@ -97,6 +115,8 @@ class RaceViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = auth.currentUid ?: return@launch
             val pb = isPersonalBest(uid, s.timeMs)
+            // Result 화면이 읽어갈 수 있도록 트랙 보관 — submit 보다 먼저 (네트워크 실패해도 화면엔 표시되게)
+            trackHolder.set(track = _track.value, courseId = courseId)
             submit.invoke(
                 uid = uid,
                 courseId = courseId,

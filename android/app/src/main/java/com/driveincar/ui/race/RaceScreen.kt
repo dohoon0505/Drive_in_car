@@ -23,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -34,13 +36,29 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.driveincar.core.time.TimeFormat
+import com.driveincar.domain.model.Course
+import com.driveincar.domain.model.toLatLngList
 import com.driveincar.domain.race.RaceState
 import com.driveincar.ui.components.Overline
+import com.driveincar.ui.map.MAP_STYLE_DARK_JSON
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.JointType
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.RoundCap
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.driveincar.domain.model.LatLng as DomainLatLng
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -52,6 +70,7 @@ fun RaceScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val course by vm.course.collectAsStateWithLifecycle()
+    val track by vm.track.collectAsStateWithLifecycle()
 
     val finePermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
     LaunchedEffect(Unit) {
@@ -87,7 +106,7 @@ fun RaceScreen(
                 .padding(horizontal = 16.dp, vertical = 60.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            HudCard(modifier = Modifier.weight(1f)) {
+            HudCard(modifier = Modifier.fillMaxWidth()) {
                 Overline(text = "NOW DRIVING", color = accent, tracking = 0.20f)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -100,9 +119,27 @@ fun RaceScreen(
             }
         }
 
-        // Center: lap clock
+        // 미니맵: 코스 라인(반투명) + 라이브 궤적(전경) + 현재 위치 마커
+        course?.let { c ->
+            RaceMiniMap(
+                course = c,
+                track = track,
+                accent = accent,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 130.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, ApexColors.Border, RoundedCornerShape(18.dp))
+            )
+        }
+
+        // Center-bottom: lap clock + metrics (미니맵 아래로 자연스럽게 내림)
         Column(
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 130.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when (val s = state) {
@@ -142,14 +179,13 @@ fun RaceScreen(
                         letterSpacing = (-0.04).em,
                         lineHeight = 84.sp,
                     )
-                    Spacer(Modifier.height(24.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(40.dp),
-                    ) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
                         Metric(label = "SPEED", value = "${"%.0f".format(s.currentKmh)}", unit = "km/h")
-                        Box(modifier = Modifier
-                            .size(width = 1.dp, height = 40.dp)
-                            .background(ApexColors.Border)
+                        Box(
+                            modifier = Modifier
+                                .size(width = 1.dp, height = 40.dp)
+                                .background(ApexColors.Border)
                         )
                         Metric(label = "REMAINING", value = "${"%.0f".format(s.distanceToEndM)}", unit = "m")
                     }
@@ -164,7 +200,7 @@ fun RaceScreen(
             }
         }
 
-        // Abort pill at bottom
+        // Abort pill
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -188,6 +224,68 @@ fun RaceScreen(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = Pretendard,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RaceMiniMap(
+    course: Course,
+    track: List<DomainLatLng>,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val mapStyle = remember { MapStyleOptions(MAP_STYLE_DARK_JSON) }
+    val cameraState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(
+            LatLng(course.startCoord.lat, course.startCoord.lng),
+            13f,
+        )
+    }
+    GoogleMap(
+        modifier = modifier,
+        cameraPositionState = cameraState,
+        properties = MapProperties(mapStyleOptions = mapStyle),
+        uiSettings = MapUiSettings(
+            zoomControlsEnabled = false,
+            myLocationButtonEnabled = false,
+            mapToolbarEnabled = false,
+            compassEnabled = false,
+            scrollGesturesEnabled = false,
+            zoomGesturesEnabled = false,
+            tiltGesturesEnabled = false,
+            rotationGesturesEnabled = false,
+        ),
+    ) {
+        // 코스 라인 (반투명 배경)
+        val coursePts = course.toLatLngList().map { LatLng(it.lat, it.lng) }
+        Polyline(
+            points = coursePts,
+            color = accent.copy(alpha = 0.4f),
+            width = 8f,
+            jointType = JointType.ROUND,
+            startCap = RoundCap(),
+            endCap = RoundCap(),
+            zIndex = 1f,
+        )
+        // 라이브 궤적 (전경, 두꺼운 라인)
+        if (track.size >= 2) {
+            Polyline(
+                points = track.map { LatLng(it.lat, it.lng) },
+                color = accent,
+                width = 12f,
+                jointType = JointType.ROUND,
+                startCap = RoundCap(),
+                endCap = RoundCap(),
+                zIndex = 2f,
+            )
+        }
+        // 현재 위치 마커
+        track.lastOrNull()?.let { last ->
+            Marker(
+                state = MarkerState(LatLng(last.lat, last.lng)),
+                title = "지금 위치",
             )
         }
     }
