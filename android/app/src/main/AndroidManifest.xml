@@ -47,10 +47,13 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Naver Maps SDK Client ID (secrets-gradle-plugin 이 local.properties 에서 주입).
-             패키지명 com.driveincar 가 NCP Console 에 등록되어 있으면 SDK 가 검증 통과. -->
+        <!-- Naver Maps SDK 인증.
+             VPC > Maps > Application 에서 발급한 NCP API Key ID 를 NCP_KEY_ID 메타에 넣는다.
+             구 AI Service Maps 의 CLIENT_ID 와 다른 키 이름이라 혼동 주의 — VPC Maps 는 반드시 NCP_KEY_ID.
+             secrets-gradle-plugin 이 local.properties 의 NAVER_MAP_CLIENT_ID 값을 여기 주입.
+             SDK 는 패키지명 com.driveincar 가 NCP Console 에 등록되어 있는지도 검증한다. -->
         <meta-data
-            android:name="com.naver.maps.map.CLIENT_ID"
+            android:name="com.naver.maps.map.NCP_KEY_ID"
             android:value="${NAVER_MAP_CLIENT_ID}" />
 
     </application>
