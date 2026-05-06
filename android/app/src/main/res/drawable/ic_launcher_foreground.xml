@@ -1,33 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Apex Lines 앱 아이콘 전경.
+
+  검정 차체 정면 + 시안 V자 헤드라이트, 위쪽에서 따뜻한 앰버 글로우가 비추는 컴포지션.
+  벡터 드로어블이라 모든 dpi 에서 선명. viewport 108x108, 안전 영역 24~84 안에 차를 위치.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Stylized car driving on a winding road. White on the brand-colored background. -->
-    <group android:scaleX="1.6"
-        android:scaleY="1.6"
-        android:translateX="22"
-        android:translateY="22">
-        <!-- Winding road curve -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:fillAlpha="0.25"
-            android:pathData="M0,32 C8,24 16,40 24,32 C32,24 40,40 40,32 L40,36 C32,44 24,28 16,36 C8,44 0,28 -2,36 Z"/>
-        <!-- Car body -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M6,16 L34,16 L37,22 L37,28 L34,30 L6,30 L3,28 L3,22 Z"/>
-        <!-- Car roof -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M11,6 L29,6 L34,16 L6,16 Z"/>
-        <!-- Wheels -->
-        <path
-            android:fillColor="#1F6FEB"
-            android:pathData="M11,30 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
-        <path
-            android:fillColor="#1F6FEB"
-            android:pathData="M29,30 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/>
-    </group>
+
+    <!-- ===== 1. 위쪽에서 비치는 따뜻한 앰버 글로우 (커다란 부드러운 ellipse) ===== -->
+    <path
+        android:fillColor="#3B2410"
+        android:fillAlpha="0.55"
+        android:pathData="M54,12 m-44,0 a44,38 0 1,0 88,0 a44,38 0 1,0 -88,0" />
+    <path
+        android:fillColor="#5A3818"
+        android:fillAlpha="0.45"
+        android:pathData="M54,18 m-30,0 a30,24 0 1,0 60,0 a30,24 0 1,0 -60,0" />
+
+    <!-- ===== 2. 차체 그림자 (노면에 떨어지는 부드러운 원) ===== -->
+    <path
+        android:fillColor="#2A1A0A"
+        android:fillAlpha="0.6"
+        android:pathData="M54,90 m-30,0 a30,4 0 1,0 60,0 a30,4 0 1,0 -60,0" />
+
+    <!-- ===== 3. 차체 (정면) ===== -->
+    <!-- 지붕 / 윗면 -->
+    <path
+        android:fillColor="#070809"
+        android:pathData="M40,40 L68,40 L70,46 L38,46 Z" />
+    <!-- 윈드실드 (살짝 반사 감) -->
+    <path
+        android:fillColor="#15171D"
+        android:pathData="M40,46 L68,46 L72,54 L36,54 Z" />
+    <!-- 후드 / 어깨 -->
+    <path
+        android:fillColor="#0A0B0E"
+        android:pathData="M36,54 L72,54 L80,66 L28,66 Z" />
+    <!-- 메인 바디 (펜더 + 범퍼) -->
+    <path
+        android:fillColor="#080A0D"
+        android:pathData="M28,66 L80,66 L82,70 L82,82 L78,86 L72,86 L70,82 L38,82 L36,86 L30,86 L26,82 L26,70 Z" />
+    <!-- 사이드미러 좌/우 -->
+    <path
+        android:fillColor="#0A0B0E"
+        android:pathData="M30,56 L36,56 L34,62 L26,62 Z" />
+    <path
+        android:fillColor="#0A0B0E"
+        android:pathData="M72,56 L78,56 L82,62 L74,62 Z" />
+
+    <!-- ===== 4. 시안 V자 헤드라이트 (좌) ===== -->
+    <!-- 외곽 글로우 -->
+    <path
+        android:fillColor="#3DDFFF"
+        android:fillAlpha="0.35"
+        android:pathData="M28,68 L46,72 L48,79 L30,80 Z" />
+    <!-- 메인 라이트 본체 -->
+    <path
+        android:fillColor="#9CECFF"
+        android:pathData="M30,69 L43,72 L45,77 L32,78 Z" />
+    <!-- 안쪽 밝은 코어 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,71 L40,73 L41,75 L33,76 Z" />
+
+    <!-- ===== 5. 시안 V자 헤드라이트 (우) ===== -->
+    <path
+        android:fillColor="#3DDFFF"
+        android:fillAlpha="0.35"
+        android:pathData="M80,68 L62,72 L60,79 L78,80 Z" />
+    <path
+        android:fillColor="#9CECFF"
+        android:pathData="M78,69 L65,72 L63,77 L76,78 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M76,71 L68,73 L67,75 L75,76 Z" />
+
+    <!-- ===== 6. 그릴 가운데 어두운 얇은 라인 (선명한 정면 느낌) ===== -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M48,77 L60,77 L60,80 L48,80 Z" />
 </vector>

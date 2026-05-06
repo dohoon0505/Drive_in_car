@@ -35,12 +35,14 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.driveincar.R
 import com.driveincar.core.time.TimeFormat
 import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.domain.race.RaceState
 import com.driveincar.ui.components.Overline
 import com.driveincar.ui.map.MAP_STYLE_DARK_JSON
+import com.driveincar.ui.map.rememberMarkerIcon
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -243,6 +245,9 @@ private fun RaceMiniMap(
             13f,
         )
     }
+    val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 30)
+    val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 26)
+
     GoogleMap(
         modifier = modifier,
         cameraPositionState = cameraState,
@@ -281,7 +286,20 @@ private fun RaceMiniMap(
                 zIndex = 2f,
             )
         }
-        // 현재 위치 마커
+        // 출발/도착 — 커스텀 ▶/체커 마커
+        Marker(
+            state = MarkerState(coursePts.first()),
+            title = "출발",
+            icon = startIcon,
+            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+        )
+        Marker(
+            state = MarkerState(coursePts.last()),
+            title = "도착",
+            icon = finishIcon,
+            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+        )
+        // 현재 위치 마커 (시스템 기본 — 자기 위치는 명확히 구분)
         track.lastOrNull()?.let { last ->
             Marker(
                 state = MarkerState(LatLng(last.lat, last.lng)),

@@ -36,10 +36,12 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.driveincar.R
 import com.driveincar.core.time.TimeFormat
 import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.ui.components.Overline
+import com.driveincar.ui.map.rememberMarkerIcon
 import com.driveincar.ui.components.PrimaryButton
 import com.driveincar.ui.components.SecondaryButton
 import com.driveincar.ui.map.MAP_STYLE_DARK_JSON
@@ -294,9 +296,21 @@ private fun FinishedTrackMap(
                 zIndex = 2f,
             )
         }
-        // 출발/도착 마커
-        Marker(state = MarkerState(coursePts.first()), title = "출발")
-        Marker(state = MarkerState(coursePts.last()), title = "도착", alpha = 0.7f)
+        // 출발/도착 커스텀 마커
+        val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 32)
+        val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 28)
+        Marker(
+            state = MarkerState(coursePts.first()),
+            title = "출발",
+            icon = startIcon,
+            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+        )
+        Marker(
+            state = MarkerState(coursePts.last()),
+            title = "도착",
+            icon = finishIcon,
+            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+        )
     }
 }
 

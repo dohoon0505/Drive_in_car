@@ -23,8 +23,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +49,7 @@ import com.driveincar.ui.theme.Pretendard
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.driveincar.R
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.RoundCap
 import com.google.maps.android.compose.GoogleMap
@@ -56,6 +59,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import kotlinx.coroutines.delay
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -78,6 +82,17 @@ fun MapScreen(
 
     val mapStyle = remember { MapStyleOptions(MAP_STYLE_DARK_JSON) }
 
+    // 맵 로드 상태: 8초 안에 onMapLoaded 가 안 떨어지면 Cloud Console 안내 배너 표시.
+    var mapLoaded by remember { mutableStateOf(false) }
+    var showLoadHint by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(8_000)
+        if (!mapLoaded) showLoadHint = true
+    }
+
+    val startIcon = rememberMarkerIcon(R.drawable.ic_marker_start, sizeDp = 36)
+    val finishIcon = rememberMarkerIcon(R.drawable.ic_marker_finish, sizeDp = 32)
+
     Box(modifier = Modifier
         .fillMaxSize()
         .background(ApexColors.Bg)
@@ -92,6 +107,7 @@ fun MapScreen(
                 mapToolbarEnabled = false,
                 compassEnabled = false,
             ),
+            onMapLoaded = { mapLoaded = true },
         ) {
             for (c in courses) {
                 val accent = ApexColors.accentFor(c.courseId)
@@ -106,23 +122,36 @@ fun MapScreen(
                     endCap = RoundCap(),
                     zIndex = 1f,
                 )
-                // 출발점 — 탭 가능, 코스 카드 트리거
+                // 출발점 — 탭 가능, 코스 카드 트리거. 커스텀 ▶ 마커.
                 Marker(
                     state = MarkerState(LatLng(c.startCoord.lat, c.startCoord.lng)),
                     title = c.name,
                     snippet = c.regionName,
+                    icon = startIcon,
+                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                     onClick = {
                         focusedCourseId = c.courseId
                         true
                     }
                 )
-                // 도착점 — 라인의 양 끝을 명확히 하기 위한 보조 마커
+                // 도착점 — 체커 패턴 마커
                 Marker(
                     state = MarkerState(LatLng(c.endCoord.lat, c.endCoord.lng)),
                     title = "${c.name} (도착)",
-                    alpha = 0.7f,
+                    icon = finishIcon,
+                    anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                    alpha = 0.85f,
                 )
             }
+        }
+
+        // 맵 타일 로드 실패 진단 배너 — 사용자가 아무것도 안 보일 때 명확한 다음 단계 안내
+        if (showLoadHint && !mapLoaded) {
+            MapLoadFailureBanner(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 24.dp)
+            )
         }
 
         // 상단 검색바 + 프로필 칩
@@ -215,6 +244,37 @@ private fun ProfileChip(
                 menuOpen = false
                 onLogout()
             }
+        )
+    }
+}
+
+@Composable
+private fun MapLoadFailureBanner(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .background(ApexColors.BgRaised, MaterialTheme.shapes.large)
+            .border(1.dp, ApexColors.Red.copy(alpha = 0.5f), MaterialTheme.shapes.large)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Overline(text = "MAP TILES NOT LOADING", color = ApexColors.Red, tracking = 0.32f)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "지도 타일이 안 받아져요",
+            color = ApexColors.Text,
+            fontSize = 16.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontFamily = Pretendard,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Google Cloud Console 에서:\n" +
+                "1. Maps SDK for Android 활성화\n" +
+                "2. 결제 계정 연결 (월 \$200 무료)\n" +
+                "3. API 키에 패키지명 + SHA-1 제한",
+            color = ApexColors.TextSec,
+            fontSize = 13.sp,
+            fontFamily = Pretendard,
         )
     }
 }

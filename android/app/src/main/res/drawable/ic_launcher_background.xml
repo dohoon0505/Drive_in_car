@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Apex Lines 앱 아이콘 배경.
+
+  순수 검정. 어댑티브 아이콘은 시스템이 마스크(원/스쿼클/티어드롭) 로 클립하므로
+  여기에 그라디언트를 넣어도 가장자리에서 잘려 어색함. 따뜻한 앰버 글로우는
+  foreground 에 그려서 모든 마스크에서 일관되게 보이도록 한다.
+-->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#1F6FEB" />
+    <solid android:color="#000000" />
 </shape>

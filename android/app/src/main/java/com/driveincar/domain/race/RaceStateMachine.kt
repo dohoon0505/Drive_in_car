@@ -36,6 +36,35 @@ class RaceStateMachine(
         Geo.bearingDegrees(course.startCoord, target)
     }
 
+    /**
+     * 출발 직전 마지막 웨이포인트(있으면) 또는 시작점 → 도착점 베어링.
+     * 도착선의 직각 방향을 계산할 때 사용 — 도착선은 진행 방향에 직각인 가상 선분.
+     */
+    private val finishApproachBearing: Double by lazy {
+        val from = course.waypoints.lastOrNull()
+            ?.let { LatLng(it.lat, it.lng) }
+            ?: course.startCoord
+        Geo.bearingDegrees(from, course.endCoord)
+    }
+
+    /** 출발선 (가상) — 코스 진행 방향에 직각인 선분. */
+    private val startLine: Pair<LatLng, LatLng> by lazy {
+        Geo.perpendicularLine(
+            p = course.startCoord,
+            bearingDeg = firstWaypointBearing,
+            halfWidthM = config.finishLineHalfWidthM,
+        )
+    }
+
+    /** 도착선 (가상) — 진행 방향에 직각인 선분. */
+    private val finishLine: Pair<LatLng, LatLng> by lazy {
+        Geo.perpendicularLine(
+            p = course.endCoord,
+            bearingDeg = finishApproachBearing,
+            halfWidthM = config.finishLineHalfWidthM,
+        )
+    }
+
     fun current(): RaceState = state
 
     /** 새 샘플을 입력해 상태를 갱신하고, 새 상태를 반환한다. */
@@ -91,7 +120,15 @@ class RaceStateMachine(
                 val elapsed = s.monotonicTimeMs - raceStartMs
                 val kmh = (s.speedMps ?: 0f).toDouble() * 3.6
 
-                if (dEnd <= config.endTriggerRadiusM) {
+                // 도착선 통과 판정: prev → s 가 finishLine 과 교차하면 즉시 종료.
+                // 단순 반경 진입은 1Hz 샘플에서 고속 주행 시 결승선을 "터널링" 할 수 있어 누락.
+                // CCW 라인 교차는 두 샘플 사이를 직선 보간했다고 가정하고 통과를 확실히 잡는다.
+                // 반경 fallback 도 함께 검사 — 정차/저속 진입처럼 prev 가 이미 안에 있는 케이스 커버.
+                val crossedFinish = prev != null &&
+                    Geo.segmentsIntersect(prev.coord, s.coord, finishLine.first, finishLine.second)
+                val withinEndRadius = dEnd <= config.endTriggerRadiusM
+
+                if (crossedFinish || withinEndRadius) {
                     if (elapsed < config.minRaceTimeMs) {
                         RaceState.Cancelled(CancelReason.BELOW_MIN_TIME)
                     } else {
@@ -114,20 +151,28 @@ class RaceStateMachine(
     }
 
     /**
-     * 출발선 통과 판정: 단순 반경 진입은 정차 GPS 지터로 오트리거.
-     *  (1) 직전 샘플은 START_TRIGGER_RADIUS 밖
-     *  (2) 현재 샘플은 안
-     *  (3) 진행 베어링이 출발→첫 웨이포인트 베어링과 ≤90°
+     * 출발선 통과 판정.
+     *
+     * 1차 — CCW 선분-선분 교차: prev → cur 의 이동 선분이 가상 출발선(startLine) 과 교차하면
+     *   고속 통과/터널링도 확실히 잡힘. 추가로 진행 방향이 코스 진행 방향과 ≤90° 이내일 때만
+     *   인정해 역주행/정차 지터로 오트리거되는 것을 막는다.
+     * 2차 — 반경 fallback: prev 가 이미 출발점 가까이 있던 채로 cur 가 안으로 들어왔다면
+     *   라인 교차가 안 잡힐 수 있어 (선이 짧거나 prev 가 선 안쪽에서 출발) 반경 + 베어링도 같이.
      */
     private fun shouldStart(prev: LocationSample, cur: LocationSample): Boolean {
+        val bearing = Geo.bearingDegrees(prev.coord, cur.coord)
+        val bearingDelta = Geo.bearingDelta(bearing, firstWaypointBearing)
+        val movingForward = bearingDelta <= config.startBearingToleranceDeg
+        if (!movingForward) return false
+
+        // 1차: CCW 라인 교차 (가장 정확)
+        if (Geo.segmentsIntersect(prev.coord, cur.coord, startLine.first, startLine.second)) {
+            return true
+        }
+        // 2차: 반경 진입 fallback (정차/저속 진입 케이스)
         val prevDist = Geo.distanceMeters(prev.coord, course.startCoord)
         val curDist = Geo.distanceMeters(cur.coord, course.startCoord)
-        if (prevDist <= config.startTriggerRadiusM) return false
-        if (curDist > config.startTriggerRadiusM) return false
-
-        val bearing = Geo.bearingDegrees(prev.coord, cur.coord)
-        val delta = Geo.bearingDelta(bearing, firstWaypointBearing)
-        return delta <= config.startBearingToleranceDeg
+        return prevDist > config.startTriggerRadiusM && curDist <= config.startTriggerRadiusM
     }
 
     val totalSampleCount: Int get() = sampleCount

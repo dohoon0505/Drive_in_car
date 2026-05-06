@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  코스 출발점 마커 — 동그란 인디고 배경 + 흰 ▶ chevron.
+  GoogleMap.Marker 의 BitmapDescriptorFactory.fromResource 가 받아 비트맵으로 렌더한다.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="36"
+    android:viewportHeight="36">
+    <!-- 외곽 쉐도우 -->
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.45"
+        android:pathData="M18,33 m-9,0 a9,3 0 1,0 18,0 a9,3 0 1,0 -18,0"/>
+    <!-- 본체 원 -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M18,18 m-15,0 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0"/>
+    <!-- 안쪽 보더 -->
+    <path
+        android:fillColor="#0B0D12"
+        android:pathData="M18,18 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0"/>
+    <!-- ▶ chevron (출발 방향 의미) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,11 L24,18 L14,25 Z"/>
+</vector>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  코스 도착점 마커 — 동그란 앰버 배경 + 체커 패턴 4분면.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="36"
+    android:viewportHeight="36">
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.45"
+        android:pathData="M18,33 m-9,0 a9,3 0 1,0 18,0 a9,3 0 1,0 -18,0"/>
+    <!-- 본체 원 (앰버) -->
+    <path
+        android:fillColor="#FFD60A"
+        android:pathData="M18,18 m-15,0 a15,15 0 1,0 30,0 a15,15 0 1,0 -30,0"/>
+    <!-- 어두운 안쪽 원 -->
+    <path
+        android:fillColor="#0B0D12"
+        android:pathData="M18,18 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"/>
+    <!-- 2x2 체커 (Q1, Q3 흰색) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11,11 L18,11 L18,18 L11,18 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,18 L25,18 L25,25 L18,25 Z"/>
+    <path
+        android:fillColor="#FFD60A"
+        android:pathData="M18,11 L25,11 L25,18 L18,18 Z"/>
+    <path
+        android:fillColor="#FFD60A"
+        android:pathData="M11,18 L18,18 L18,25 L11,25 Z"/>
+</vector>
