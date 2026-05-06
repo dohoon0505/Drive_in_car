@@ -9,7 +9,7 @@ import com.driveincar.domain.model.LatLng
  * 순수 도메인 함수: 위치 샘플 시퀀스를 받아 상태 전이를 계산한다.
  *
  * Firebase / Android SDK / 코루틴에 의존하지 않으므로 단위 테스트가 쉽다.
- * 동일 픽스처(`docs/race-fixtures/*.json`)로 iOS 측 구현과 비교 검증한다.
+ * 동일 픽스처(docs/race-fixtures 의 JSON 파일들)로 iOS 측 구현과 비교 검증한다.
  */
 class RaceStateMachine(
     private val course: Course,
