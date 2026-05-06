@@ -63,10 +63,13 @@ android {
 }
 
 // Reads MAPS_API_KEY from local.properties (gitignored) and exposes it as
-// android.geo.API_KEY meta-data placeholder. See secrets-gradle-plugin docs.
+// android.geo.API_KEY meta-data placeholder. local.properties는 Android Gradle의
+// 표준 시크릿 파일로, sdk.dir / MAPS_API_KEY 등을 한 군데에 두는 게 컨벤션이다.
 secrets {
-    propertiesFileName = "secrets.properties"
+    propertiesFileName = "local.properties"
     defaultPropertiesFileName = "local.defaults.properties"
+    // 키 값을 BuildConfig 에 절대 노출하지 않는다(보안).
+    ignoreList.add("sdk.*")
 }
 
 dependencies {

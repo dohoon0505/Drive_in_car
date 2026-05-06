@@ -13,13 +13,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 data class LoginUiState(
     val email: String = "",
     val password: String = "",
     val isSubmitting: Boolean = false,
-    val sheetVisible: Boolean = false,
     val error: String? = null,
 )
 
@@ -39,10 +39,8 @@ class LoginViewModel @Inject constructor(
     private val _events = MutableSharedFlow<LoginEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<LoginEvent> = _events.asSharedFlow()
 
-    fun openSheet() = _uiState.update { it.copy(sheetVisible = true, error = null) }
-    fun closeSheet() = _uiState.update { it.copy(sheetVisible = false) }
-    fun onEmailChange(s: String) = _uiState.update { it.copy(email = s) }
-    fun onPasswordChange(s: String) = _uiState.update { it.copy(password = s) }
+    fun onEmailChange(s: String) = _uiState.update { it.copy(email = s, error = null) }
+    fun onPasswordChange(s: String) = _uiState.update { it.copy(password = s, error = null) }
 
     fun signIn() = submit { auth.signInWithEmail(it.email.trim(), it.password) }
     fun signUp() = submit { auth.signUpWithEmail(it.email.trim(), it.password) }
@@ -56,16 +54,31 @@ class LoginViewModel @Inject constructor(
         }
         _uiState.update { it.copy(isSubmitting = true, error = null) }
         viewModelScope.launch {
-            block(s).fold(
-                onSuccess = { uid ->
-                    val needsProfile = users.fetchUser(uid) == null
-                    _uiState.update { it.copy(isSubmitting = false, sheetVisible = false) }
-                    _events.emit(LoginEvent.SignedIn(needsProfile))
-                },
-                onFailure = { e ->
-                    _uiState.update { it.copy(isSubmitting = false, error = e.localizedMessage) }
+            // Auth 호출도 네트워크가 안 되면 매달릴 수 있어 안전망 timeout.
+            val result = withTimeoutOrNull(15_000L) { block(s) }
+            when {
+                result == null -> _uiState.update {
+                    it.copy(
+                        isSubmitting = false,
+                        error = "응답이 늦어요. 인터넷 연결을 확인해주세요.",
+                    )
                 }
-            )
+                result.isSuccess -> {
+                    val uid = result.getOrThrow()
+                    val needsProfile = users.fetchUser(uid) == null
+                    _uiState.update { it.copy(isSubmitting = false) }
+                    _events.emit(LoginEvent.SignedIn(needsProfile))
+                }
+                else -> {
+                    val e = result.exceptionOrNull()
+                    _uiState.update {
+                        it.copy(
+                            isSubmitting = false,
+                            error = e?.localizedMessage ?: "로그인에 실패했어요.",
+                        )
+                    }
+                }
+            }
         }
     }
 }
