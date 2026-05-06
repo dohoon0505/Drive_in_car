@@ -1,4 +1,4 @@
-# Drive in Car — Android 빌드 + 실기기 재설치 스크립트 (Windows PowerShell)
+﻿# Drive in Car — Android 빌드 + 실기기 재설치 스크립트 (Windows PowerShell)
 #
 # 동작:
 #   1. JDK / Android SDK / adb 위치 자동 탐지
@@ -65,8 +65,10 @@ function Find-Sdk {
         $env:ANDROID_SDK_ROOT,
         "$env:LOCALAPPDATA\Android\Sdk",
         "C:\Android\Sdk"
-    ) | Where-Object { $_ -and (Test-Path $_) }
-    if ($candidates.Count -gt 0) { return $candidates[0] }
+    )
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path $c)) { return $c }
+    }
     return $null
 }
 
@@ -136,7 +138,7 @@ if (-not $devices -or $devices.Count -eq 0) {
     Write-Host "  - USB 케이블이 연결되어 있는지" -ForegroundColor Red
     Write-Host "  - 기기에서 [개발자 옵션 → USB 디버깅] 이 켜져 있는지" -ForegroundColor Red
     Write-Host "  - 처음 연결한 기기라면 화면에 뜬 [USB 디버깅 허용] 다이얼로그를 수락했는지" -ForegroundColor Red
-    Write-Host "확인하세요. (`adb devices` 로 직접 확인 가능)" -ForegroundColor Red
+    Write-Host '확인하세요. (직접 확인: adb devices)' -ForegroundColor Red
     exit 1
 }
 
