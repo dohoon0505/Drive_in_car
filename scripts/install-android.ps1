@@ -128,11 +128,16 @@ if (-not (Test-Path $apkPath)) { Fail "APK not found at $apkPath" }
 Step "Built: $apkPath"
 
 # 7. 기기 확인 ----------------------------------------------------------------
+# adb devices 출력에서 시리얼만 추출. @(...) 로 강제 배열화 — 1개일 때 string으로
+# 떨어지면 [0]이 첫 글자가 되어버린다 (시리얼 "R5KL..." → "R" 버그).
 $rawDevices = & $adb devices
-$lines = $rawDevices | Select-String -Pattern '^([A-Za-z0-9._:-]+)\s+device$'
-$devices = $lines | ForEach-Object { ($_.Matches[0].Groups[1].Value) }
+$devices = @(
+    $rawDevices |
+        Select-String -Pattern '^([A-Za-z0-9._:-]+)\s+device$' |
+        ForEach-Object { $_.Matches[0].Groups[1].Value }
+)
 
-if (-not $devices -or $devices.Count -eq 0) {
+if ($devices.Count -eq 0) {
     Write-Host ""
     Write-Host "연결된 기기가 없습니다." -ForegroundColor Red
     Write-Host "  - USB 케이블이 연결되어 있는지" -ForegroundColor Red
@@ -156,11 +161,19 @@ if ($DeviceSerial) {
 Step "Target device: $target"
 
 # 8. Uninstall (이미 있으면) --------------------------------------------------
-$pkg = if ($Release) { 'com.driveincar' } else { 'com.driveincar.debug' }
-$existing = & $adb -s $target shell pm list packages $pkg
-if ($existing -match $pkg) {
+# debug/release 모두 동일 패키지(com.driveincar)를 사용한다.
+# 추후 dev/prod 분리 시 build.gradle.kts 의 applicationIdSuffix 를 켜고 여기도 분기.
+#
+# `pm path` 가 빈 출력이면 미설치, APK 경로가 나오면 기존 설치됨.
+# (Samsung Knox 등 일부 기기는 `pm list packages` 가 권한 오류를 내므로 path 사용.)
+$pkg = 'com.driveincar'
+$pmPath = & $adb -s $target shell pm path $pkg 2>$null
+if ($pmPath -and ($pmPath -match 'package:')) {
     Step "기존 앱($pkg) 발견 → uninstall"
-    & $adb -s $target uninstall $pkg | Out-Null
+    $uninstallOut = & $adb -s $target uninstall $pkg 2>&1
+    if ($LASTEXITCODE -ne 0 -or $uninstallOut -notmatch 'Success') {
+        Warn "uninstall 결과: $uninstallOut (install -r 로 덮어쓰기 시도)"
+    }
 } else {
     Step "기존 앱 없음 — 신규 설치"
 }

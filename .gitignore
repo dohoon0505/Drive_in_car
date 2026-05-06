@@ -21,6 +21,7 @@ $RECYCLE.BIN/
 
 # ---------- Android (Gradle / Kotlin) ----------
 android/.gradle/
+android/.kotlin/
 android/build/
 android/captures/
 android/.externalNativeBuild/

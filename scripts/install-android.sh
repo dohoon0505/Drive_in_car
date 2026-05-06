@@ -127,7 +127,7 @@ fi
 step "Target device: $TARGET"
 
 # 7. Uninstall + install
-PKG=$([[ $RELEASE -eq 1 ]] && echo "com.driveincar" || echo "com.driveincar.debug")
+PKG="com.driveincar"  # debug/release 모두 동일 패키지
 if "$ADB" -s "$TARGET" shell pm list packages "$PKG" | grep -q "$PKG"; then
     step "기존 앱($PKG) 발견 → uninstall"
     "$ADB" -s "$TARGET" uninstall "$PKG" > /dev/null

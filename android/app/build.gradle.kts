@@ -27,7 +27,9 @@ android {
     buildTypes {
         debug {
             isDebuggable = true
-            applicationIdSuffix = ".debug"
+            // applicationIdSuffix 미사용: 단일 Firebase 앱 등록(com.driveincar)으로 동작.
+            // 별도 dev/prod 분리가 필요해지면 ".debug" 를 다시 켜고 Firebase Console에서
+            // com.driveincar.debug 를 별도 Android 앱으로 등록하세요.
         }
         release {
             isMinifyEnabled = true
