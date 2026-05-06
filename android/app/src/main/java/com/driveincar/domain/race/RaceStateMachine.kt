@@ -29,13 +29,6 @@ class RaceStateMachine(
             course.endCoord
     }
 
-    private val firstWaypointBearing: Double by lazy {
-        val target = course.waypoints.firstOrNull()
-            ?.let { LatLng(it.lat, it.lng) }
-            ?: course.endCoord
-        Geo.bearingDegrees(course.startCoord, target)
-    }
-
     /**
      * 출발 직전 마지막 웨이포인트(있으면) 또는 시작점 → 도착점 베어링.
      * 도착선의 직각 방향을 계산할 때 사용 — 도착선은 진행 방향에 직각인 가상 선분.
@@ -45,15 +38,6 @@ class RaceStateMachine(
             ?.let { LatLng(it.lat, it.lng) }
             ?: course.startCoord
         Geo.bearingDegrees(from, course.endCoord)
-    }
-
-    /** 출발선 (가상) — 코스 진행 방향에 직각인 선분. */
-    private val startLine: Pair<LatLng, LatLng> by lazy {
-        Geo.perpendicularLine(
-            p = course.startCoord,
-            bearingDeg = firstWaypointBearing,
-            halfWidthM = config.finishLineHalfWidthM,
-        )
     }
 
     /** 도착선 (가상) — 진행 방향에 직각인 선분. */
@@ -94,17 +78,41 @@ class RaceStateMachine(
         return when (val cur = state) {
             is RaceState.Idle, is RaceState.Arming -> {
                 val dStart = Geo.distanceMeters(s.coord, course.startCoord)
-                if (dStart <= config.armRadiusM) RaceState.Armed
+                if (dStart <= config.armRadiusM) RaceState.Armed()
                 else RaceState.Arming(dStart)
             }
             is RaceState.Armed -> {
-                if (prev != null && shouldStart(prev, s)) {
-                    raceStartMs = s.monotonicTimeMs
+                // 출발 영역 이탈 → 다시 Arming (정지 카운트다운 리셋)
+                val dStart = Geo.distanceMeters(s.coord, course.startCoord)
+                if (dStart > config.armRadiusM) {
+                    return RaceState.Arming(dStart)
+                }
+
+                // 정지-출발 측정: 0km/h (표시상) 가 5초 유지되면 레이스 시작.
+                val speedMps = (s.speedMps ?: 0f).toDouble()
+                val isStationary = speedMps < config.stationarySpeedMps
+                val now = s.monotonicTimeMs
+                val nextSinceMs: Long? = when {
+                    !isStationary -> null                              // 움직임 → 카운트다운 리셋
+                    cur.stationarySinceMs == null -> now               // 막 정지 시작
+                    else -> cur.stationarySinceMs                      // 정지 유지
+                }
+                if (nextSinceMs != null && (now - nextSinceMs) >= config.stationaryDurationMs) {
+                    // 5초 정지 충족 → 레이스 시작 (정지 상태에서 가속 시작 — drag race 식)
+                    raceStartMs = now
                     traveledMeters = 0.0
+                    outOfCorridorMs = 0L
                     val dEnd = Geo.distanceMeters(s.coord, course.endCoord)
-                    val kmh = (s.speedMps ?: 0f).toDouble() * 3.6
-                    RaceState.InRace(elapsedMs = 0L, distanceToEndM = dEnd, currentKmh = kmh)
-                } else cur
+                    return RaceState.InRace(elapsedMs = 0L, distanceToEndM = dEnd, currentKmh = 0.0)
+                }
+                val remaining = if (nextSinceMs == null) null else
+                    ((config.stationaryDurationMs - (now - nextSinceMs)) / 1000)
+                        .toInt()
+                        .coerceAtLeast(0)
+                return RaceState.Armed(
+                    stationarySinceMs = nextSinceMs,
+                    countdownSecondsRemaining = remaining,
+                )
             }
             is RaceState.InRace -> {
                 // 코리도 체크
@@ -148,31 +156,6 @@ class RaceStateMachine(
             }
             is RaceState.Finished, is RaceState.Cancelled -> cur
         }
-    }
-
-    /**
-     * 출발선 통과 판정.
-     *
-     * 1차 — CCW 선분-선분 교차: prev → cur 의 이동 선분이 가상 출발선(startLine) 과 교차하면
-     *   고속 통과/터널링도 확실히 잡힘. 추가로 진행 방향이 코스 진행 방향과 ≤90° 이내일 때만
-     *   인정해 역주행/정차 지터로 오트리거되는 것을 막는다.
-     * 2차 — 반경 fallback: prev 가 이미 출발점 가까이 있던 채로 cur 가 안으로 들어왔다면
-     *   라인 교차가 안 잡힐 수 있어 (선이 짧거나 prev 가 선 안쪽에서 출발) 반경 + 베어링도 같이.
-     */
-    private fun shouldStart(prev: LocationSample, cur: LocationSample): Boolean {
-        val bearing = Geo.bearingDegrees(prev.coord, cur.coord)
-        val bearingDelta = Geo.bearingDelta(bearing, firstWaypointBearing)
-        val movingForward = bearingDelta <= config.startBearingToleranceDeg
-        if (!movingForward) return false
-
-        // 1차: CCW 라인 교차 (가장 정확)
-        if (Geo.segmentsIntersect(prev.coord, cur.coord, startLine.first, startLine.second)) {
-            return true
-        }
-        // 2차: 반경 진입 fallback (정차/저속 진입 케이스)
-        val prevDist = Geo.distanceMeters(prev.coord, course.startCoord)
-        val curDist = Geo.distanceMeters(cur.coord, course.startCoord)
-        return prevDist > config.startTriggerRadiusM && curDist <= config.startTriggerRadiusM
     }
 
     val totalSampleCount: Int get() = sampleCount

@@ -10,61 +10,76 @@ import org.junit.Test
 
 class RaceStateMachineTest {
 
-    /** 양 플랫폼이 동일하게 처리해야 하는 happy path. */
+    /**
+     * 정지-출발 흐름의 happy path:
+     * Idle → Arming → Armed (정지 5초) → InRace → Finished
+     */
     @Test
-    fun `idle → arming → armed → inrace → finished`() {
+    fun `idle → arming → armed (5s stationary) → inrace → finished`() {
         val course = sampleCourse()
         val m = RaceStateMachine(course, RaceConfig())
 
-        // 1. 멀리서 출발점 진입 시작
-        assertTrue(m.onSample(loc(38.117, 128.380, 0L)) is RaceState.Arming)
+        // 1. 출발점에서 멀리 있을 때 — Arming
+        assertTrue(m.onSample(loc(38.117, 128.380, 0L, speed = 5f)) is RaceState.Arming)
 
-        // 2. 30m 안 진입 → Armed
-        assertTrue(m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 1_000L)) is RaceState.Armed)
+        // 2. 출발점 진입 (반경 30m 안) — Armed (정지 미감지)
+        val armed1 = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 1_000L, speed = 5f))
+        assertTrue("expected Armed got $armed1", armed1 is RaceState.Armed)
+        assertEquals(null, (armed1 as RaceState.Armed).stationarySinceMs)
 
-        // 3. 출발선 통과 (직전 sample은 반경 밖, 현재는 안, 베어링 정렬)
-        // 출발선에서 살짝 떨어진 위치 → Armed에 머무름
-        val justOutside = LatLng(38.1175, 128.3781)
-        m.onSample(loc(justOutside.lat, justOutside.lng, 2_000L))
+        // 3. 0km/h 정지 시작 — Armed.stationarySinceMs 가 채워짐
+        val armed2 = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 2_000L, speed = 0f))
+        assertTrue(armed2 is RaceState.Armed)
+        assertEquals(2_000L, (armed2 as RaceState.Armed).stationarySinceMs)
+        assertEquals(5, armed2.countdownSecondsRemaining)
 
-        // 진행방향 (출발→첫 웨이포인트)와 일치하는 방향으로 진입
+        // 4. 4초 후에도 정지 유지 → 카운트다운 1초 남음
+        val armed3 = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 6_000L, speed = 0f))
+        assertTrue(armed3 is RaceState.Armed)
+        assertEquals(1, (armed3 as RaceState.Armed).countdownSecondsRemaining)
+
+        // 5. 5초 정지 충족 → InRace 전이
+        val inRace = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 7_000L, speed = 0f))
+        assertTrue("expected InRace got $inRace", inRace is RaceState.InRace)
+        assertEquals(0L, (inRace as RaceState.InRace).elapsedMs)
+
+        // 6. 30s 이상 + 도착점 도달 → Finished (구 시점 7_000 + 35_000 = 42_000 → InRace 시간 35s)
         val firstWp = course.waypoints.first()
-        val crossing = LatLng(firstWp.lat - 0.0001, firstWp.lng - 0.0001)
-        val res3 = m.onSample(loc(crossing.lat, crossing.lng, 3_000L))
-        // 출발선 통과 시 InRace로 전이 (반경 진입 + 베어링 조건 충족 시)
-        assertTrue(
-            "expected InRace but got $res3",
-            res3 is RaceState.InRace || res3 is RaceState.Armed
-        )
-
-        // 4. 시간이 30s 이상 흐르고 도착점 도달 → Finished
-        // 중간 샘플 한두개 추가로 시간 진행
-        m.onSample(loc(firstWp.lat, firstWp.lng, 35_000L))
+        m.onSample(loc(firstWp.lat, firstWp.lng, 30_000L, speed = 25f))
         val end = course.endCoord
-        val res5 = m.onSample(loc(end.lat, end.lng, 60_000L))
-        // Finished 또는 InRace (코스가 코리도 이탈 검증으로 캔슬되지 않는다는 가정)
-        assertTrue(
-            "expected Finished/Cancelled but got $res5",
-            res5 is RaceState.Finished || res5 is RaceState.Cancelled
-        )
+        val res = m.onSample(loc(end.lat, end.lng, 60_000L, speed = 5f))
+        assertTrue("expected Finished/Cancelled got $res", res is RaceState.Finished || res is RaceState.Cancelled)
+    }
+
+    /**
+     * 정지 중 잠깐이라도 움직이면 카운트다운이 리셋되는지.
+     */
+    @Test
+    fun `armed countdown resets on movement`() {
+        val course = sampleCourse()
+        val m = RaceStateMachine(course, RaceConfig())
+
+        m.onSample(loc(38.117, 128.380, 0L, speed = 5f))                                  // Arming
+        m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 1_000L, speed = 0f)) // Armed, 정지 시작
+        // 1초 뒤 살짝 움직임 (1m/s, 즉 3.6km/h — stationarySpeedMps 0.139 초과)
+        val moved = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 2_000L, speed = 1f))
+        assertTrue(moved is RaceState.Armed)
+        assertEquals(null, (moved as RaceState.Armed).stationarySinceMs)
+        // 다시 정지 → 새 stationarySinceMs
+        val restart = m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 3_000L, speed = 0f))
+        assertEquals(3_000L, (restart as RaceState.Armed).stationarySinceMs)
     }
 
     @Test
-    fun `time below MIN_RACE_TIME → cancelled`() {
+    fun `armed → out of arm radius → back to arming`() {
         val course = sampleCourse()
         val m = RaceStateMachine(course, RaceConfig())
-        // 출발과 거의 동시에 도착 → 시간 너무 짧아 BELOW_MIN_TIME으로 캔슬
-        m.onSample(loc(38.117, 128.380, 0L))
-        m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 1_000L))
-        // 출발 직후 도착점으로 점프 (실제론 발생하지 않지만 안티치트 검증)
-        val firstWp = course.waypoints.first()
-        m.onSample(loc(firstWp.lat - 0.0001, firstWp.lng - 0.0001, 2_000L))
-        val res = m.onSample(loc(course.endCoord.lat, course.endCoord.lng, 5_000L))
 
-        if (res is RaceState.Cancelled) {
-            assertEquals(CancelReason.BELOW_MIN_TIME, res.reason)
-        }
-        // 출발 트리거가 발동 안 됐을 수 있으니 단정은 약하게 둔다.
+        m.onSample(loc(38.117, 128.380, 0L, speed = 5f))                                  // Arming
+        m.onSample(loc(course.startCoord.lat, course.startCoord.lng, 1_000L, speed = 0f)) // Armed
+        // 갑자기 출발점에서 100m 멀어짐
+        val res = m.onSample(loc(course.startCoord.lat + 0.001, course.startCoord.lng, 2_000L, speed = 0f))
+        assertTrue("expected Arming got $res", res is RaceState.Arming)
     }
 
     private fun sampleCourse(): Course = Course(
@@ -85,11 +100,11 @@ class RaceStateMachineTest {
         isActive = true,
     )
 
-    private fun loc(lat: Double, lng: Double, t: Long) = LocationSample(
+    private fun loc(lat: Double, lng: Double, t: Long, speed: Float = 20f) = LocationSample(
         coord = LatLng(lat, lng),
         accuracyM = 5f,
         monotonicTimeMs = t,
-        speedMps = 20f,
+        speedMps = speed,
         bearingDeg = null,
     )
 }

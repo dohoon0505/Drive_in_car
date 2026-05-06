@@ -1,5 +1,6 @@
 package com.driveincar.ui.map
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,14 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,14 +27,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.driveincar.core.nav.ExternalNavigation
 import com.driveincar.core.time.TimeFormat
 import com.driveincar.domain.model.Course
 import com.driveincar.domain.model.Ranking
@@ -46,6 +48,8 @@ import com.driveincar.ui.components.SecondaryButton
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
 
+private const val MAX_RACE_DISTANCE_M = 5_000.0
+
 @Composable
 fun CourseDetailScreen(
     courseId: String,
@@ -54,8 +58,12 @@ fun CourseDetailScreen(
     onBack: () -> Unit,
     vm: CourseDetailViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val course by vm.course.collectAsStateWithLifecycle()
     val top3 by vm.top3.collectAsStateWithLifecycle()
+    val distanceFromMe by vm.distanceFromStartM.collectAsStateWithLifecycle()
+
+    val withinRange = distanceFromMe != null && (distanceFromMe ?: Double.MAX_VALUE) <= MAX_RACE_DISTANCE_M
 
     Box(
         modifier = Modifier
@@ -66,12 +74,23 @@ fun CourseDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 110.dp),  // sticky footer 만큼 여백
+                .padding(bottom = 110.dp),
         ) {
             val c = course
             if (c != null) {
                 Hero(course = c, onBack = onBack)
-                StatsGrid(course = c)
+                Spacer(Modifier.height(16.dp))
+                CoursePreviewMap(
+                    course = c,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, ApexColors.Border, RoundedCornerShape(18.dp))
+                )
+                Spacer(Modifier.height(20.dp))
+                StatsRow(course = c)
                 Spacer(Modifier.height(24.dp))
                 BlurbBlock(blurb = c.description)
                 Spacer(Modifier.height(24.dp))
@@ -92,8 +111,27 @@ fun CourseDetailScreen(
 
         // sticky footer CTA
         StickyFooter(
-            onJoinInfo = onViewRanking,
-            onJoinRace = onJoinRace,
+            distanceFromMeM = distanceFromMe,
+            withinRange = withinRange,
+            onJoinInfo = {
+                val c = course ?: return@StickyFooter
+                ExternalNavigation.openNaverMapDriving(
+                    context = context,
+                    dest = c.startCoord,
+                    destName = c.name,
+                )
+            },
+            onJoinRace = {
+                if (withinRange) {
+                    onJoinRace()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "출발 지점 5km 이내에서만 시작할 수 있어요",
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .background(
@@ -112,14 +150,13 @@ private fun Hero(course: Course, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(320.dp)
+            .height(280.dp)
             .background(
                 Brush.verticalGradient(
                     colors = listOf(accent.copy(alpha = 0.15f), ApexColors.Bg),
                 )
             )
     ) {
-        // 추가 비스듬한 글로우
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -134,7 +171,6 @@ private fun Hero(course: Course, onBack: () -> Unit) {
                 )
         )
 
-        // Top: 뒤로가기
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -147,7 +183,6 @@ private fun Hero(course: Course, onBack: () -> Unit) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = ApexColors.Text)
         }
 
-        // Bottom-left: region overline + 이름 + blurb
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -168,39 +203,85 @@ private fun Hero(course: Course, onBack: () -> Unit) {
     }
 }
 
+/**
+ * 4-셀 통계 행. 모든 셀 동일 BgRaised + 1dp Border + 76dp 고정 height + 균일 패딩.
+ * 4번째 셀은 "지역" 대신 "포인트 수" — 다른 셀(숫자) 와 시각 무게 통일.
+ */
 @Composable
-private fun StatsGrid(course: Course) {
+private fun StatsRow(course: Course) {
     Row(
         modifier = Modifier
             .padding(horizontal = 16.dp)
-            .background(ApexColors.Border, RoundedCornerShape(14.dp))
-            .padding(1.dp),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        StatCell(label = "거리", value = "${"%.1f".format(course.distanceMeters / 1000.0)} km", modifier = Modifier.weight(1f))
-        StatCell(label = "난이도", value = "★".repeat(course.difficulty), modifier = Modifier.weight(1f))
-        StatCell(label = "포인트", value = "${course.waypoints.size + 2}", modifier = Modifier.weight(1f))
-        StatCell(label = "지역", value = course.regionName.take(2), modifier = Modifier.weight(1f))
+        StatCell(
+            label = "거리",
+            value = "%.1f".format(course.distanceMeters / 1000.0),
+            unit = "km",
+            modifier = Modifier.weight(1f),
+        )
+        StatCell(
+            label = "난이도",
+            value = "★".repeat(course.difficulty),
+            unit = null,
+            valueColor = ApexColors.Amber,
+            modifier = Modifier.weight(1f),
+        )
+        StatCell(
+            label = "포인트",
+            value = "${course.waypoints.size + 2}",
+            unit = "개",
+            modifier = Modifier.weight(1f),
+        )
+        StatCell(
+            label = "참여",
+            value = "${course.distanceMeters.toInt() / 100}",
+            unit = "회",
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 @Composable
-private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCell(
+    label: String,
+    value: String,
+    unit: String?,
+    modifier: Modifier = Modifier,
+    valueColor: Color = ApexColors.Text,
+) {
     Column(
         modifier = modifier
-            .background(ApexColors.BgRaised)
-            .padding(vertical = 18.dp),
+            .height(76.dp)
+            .background(ApexColors.BgRaised, RoundedCornerShape(14.dp))
+            .border(1.dp, ApexColors.Border, RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = value,
-            color = ApexColors.Text,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = Pretendard,
-        )
-        Spacer(Modifier.height(4.dp))
-        Overline(text = label, color = ApexColors.TextTer, tracking = 0.04f)
+        Overline(text = label, color = ApexColors.TextTer, tracking = 0.16f)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = value,
+                color = valueColor,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = Pretendard,
+            )
+            if (unit != null) {
+                Text(
+                    text = unit,
+                    color = ApexColors.TextSec,
+                    fontSize = 11.sp,
+                    fontFamily = Pretendard,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            }
+        }
     }
 }
 
@@ -263,7 +344,6 @@ private fun RankingSection(course: Course, top3: List<Ranking>, onViewAll: () ->
         } else {
             Podium(top3 = top3)
             Spacer(Modifier.height(16.dp))
-            // top3 도 리스트로 한번 더 노출
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -284,7 +364,6 @@ private fun RankingSection(course: Course, top3: List<Ranking>, onViewAll: () ->
 
 @Composable
 private fun Podium(top3: List<Ranking>) {
-    // 디자인의 podium: 1등=가운데(amber), 2등=좌(silver), 3등=우(bronze)
     val first = top3.getOrNull(0)
     val second = top3.getOrNull(1)
     val third = top3.getOrNull(2)
@@ -382,7 +461,7 @@ private fun RankingRow(rank: Int, ranking: Ranking, deltaMs: Long?) {
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = Pretendard,
-            modifier = Modifier.width(28.dp),
+            modifier = Modifier.size(28.dp, 16.dp),
         )
         InitialBadge(nickname = ranking.nickname, carDisplay = ranking.carDisplay, sizeDp = 36)
         Column(modifier = Modifier.weight(1f)) {
@@ -423,23 +502,34 @@ private fun RankingRow(rank: Int, ranking: Ranking, deltaMs: Long?) {
 
 @Composable
 private fun StickyFooter(
+    distanceFromMeM: Double?,
+    withinRange: Boolean,
     onJoinInfo: () -> Unit,
     onJoinRace: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SecondaryButton(
-            label = "참여 안내",
-            onClick = onJoinInfo,
-            modifier = Modifier.weight(1f),
-        )
-        PrimaryButton(
-            label = "랭킹전 참여",
-            onClick = onJoinRace,
-            modifier = Modifier.weight(1.4f),
-        )
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (distanceFromMeM != null && !withinRange) {
+            Text(
+                text = "출발 지점에서 ${"%.1f".format(distanceFromMeM / 1000.0)} km 떨어져 있어요. 5km 이내로 이동하면 시작할 수 있어요.",
+                color = ApexColors.Red,
+                fontSize = 12.sp,
+                fontFamily = Pretendard,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryButton(
+                label = "참여 안내",
+                onClick = onJoinInfo,
+                modifier = Modifier.weight(1f),
+            )
+            PrimaryButton(
+                label = "랭킹전 참여",
+                onClick = onJoinRace,
+                enabled = withinRange,
+                modifier = Modifier.weight(1.4f),
+            )
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.driveincar.ui.map
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -32,23 +34,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.driveincar.R
+import com.driveincar.core.geo.Geo
 import com.driveincar.domain.model.Course
+import com.driveincar.domain.model.LatLng
 import com.driveincar.domain.model.toLatLngList
 import com.driveincar.ui.components.InitialBadge
 import com.driveincar.ui.components.Overline
-import com.driveincar.ui.components.PrimaryButton
 import com.driveincar.ui.theme.ApexColors
 import com.driveincar.ui.theme.Pretendard
 import com.naver.maps.geometry.LatLng as NaverLatLng
+import com.naver.maps.map.CameraAnimation
 import com.naver.maps.map.CameraPosition
+import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.Overlay
@@ -63,15 +66,10 @@ fun MapScreen(
     vm: MapViewModel = hiltViewModel(),
 ) {
     val courses by vm.courses.collectAsStateWithLifecycle()
+    val nearestCourses by vm.nearestCourses.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
+    val myLocation by vm.myLocation.collectAsStateWithLifecycle()
 
-    var focusedCourseId by remember { mutableStateOf<String?>(null) }
-    val focusedCourse: Course? = remember(focusedCourseId, courses) {
-        focusedCourseId?.let { id -> courses.firstOrNull { it.courseId == id } }
-            ?: courses.firstOrNull()
-    }
-
-    // 8초 안에 onMapLoaded 안 떨어지면 Cloud / NCP Console 안내 배너.
     var mapLoaded by remember { mutableStateOf(false) }
     var showLoadHint by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -84,6 +82,18 @@ fun MapScreen(
 
     var naverMap by remember { mutableStateOf<NaverMap?>(null) }
 
+    // 첫 GPS fix 가 떨어지면 카메라를 그 위치로 줌인.
+    LaunchedEffect(naverMap, myLocation) {
+        val map = naverMap ?: return@LaunchedEffect
+        val here = myLocation ?: return@LaunchedEffect
+        map.moveCamera(
+            CameraUpdate.scrollAndZoomTo(
+                NaverLatLng(here.lat, here.lng),
+                13.0,
+            ).animate(CameraAnimation.Easing)
+        )
+    }
+
     Box(modifier = Modifier
         .fillMaxSize()
         .background(ApexColors.Bg)
@@ -92,8 +102,8 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize(),
             onMapReady = { map ->
                 naverMap = map
+                // 위치 미허용 케이스 fallback: 한반도 중앙
                 map.cameraPosition = CameraPosition(NaverLatLng(36.5, 127.8), 6.5)
-                // 어떤 UI 컨트롤도 안 보이게 (글래스 오버레이가 따로 있음)
                 map.uiSettings.apply {
                     isCompassEnabled = false
                     isScaleBarEnabled = false
@@ -105,13 +115,12 @@ fun MapScreen(
             onMapLoaded = { mapLoaded = true },
         )
 
-        // 코스 마커 + 폴리라인 — courses / naverMap 변화에 따라 갱신
         CourseOverlays(
             naverMap = naverMap,
             courses = courses,
             startIcon = startIcon,
             finishIcon = finishIcon,
-            onMarkerClick = { focusedCourseId = it },
+            onMarkerClick = { onCourseSelected(it) },
         )
 
         // 상단 검색바 + 프로필 칩
@@ -146,22 +155,112 @@ fun MapScreen(
             )
         }
 
-        focusedCourse?.let { c ->
-            CoursePeekCard(
-                course = c,
-                onTap = { onCourseSelected(c.courseId) },
+        // 가까운 코스 3개 스택 (가장 가까운 순)
+        if (nearestCourses.isNotEmpty()) {
+            NearbyCourseStack(
+                courses = nearestCourses,
+                myLocation = myLocation,
+                onCourseTap = { onCourseSelected(it) },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 12.dp, vertical = 24.dp),
+                    .padding(horizontal = 12.dp, vertical = 16.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun NearbyCourseStack(
+    courses: List<Course>,
+    myLocation: LatLng?,
+    onCourseTap: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Overline(
+            text = "가까운 코스",
+            color = ApexColors.TextSec,
+            tracking = 0.20f,
+            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+        )
+        for (c in courses) {
+            NearbyCourseCard(
+                course = c,
+                myLocation = myLocation,
+                onTap = { onCourseTap(c.courseId) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NearbyCourseCard(
+    course: Course,
+    myLocation: LatLng?,
+    onTap: () -> Unit,
+) {
+    val accent = ApexColors.accentFor(course.courseId)
+    val distanceKm: Double? = remember(course, myLocation) {
+        myLocation?.let { Geo.distanceMeters(it, course.startCoord) / 1000.0 }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ApexColors.BgRaised, RoundedCornerShape(16.dp))
+            .border(1.dp, ApexColors.Border, RoundedCornerShape(16.dp))
+            .clickable { onTap() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // 액센트 색 dot
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(accent, CircleShape),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = course.name,
+                color = ApexColors.Text,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = Pretendard,
+            )
+            Spacer(Modifier.height(2.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (distanceKm != null) {
+                    Text(
+                        text = "${"%.1f".format(distanceKm)} km 거리",
+                        color = ApexColors.TextSec,
+                        fontSize = 12.sp,
+                        fontFamily = Pretendard,
+                    )
+                }
+                Text(
+                    text = "★".repeat(course.difficulty),
+                    color = ApexColors.Amber,
+                    fontSize = 12.sp,
+                    fontFamily = Pretendard,
+                )
+            }
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = ApexColors.TextTer,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
 /**
  * courses 리스트 / naverMap 변경 시 폴리라인 + 마커를 모두 재구성.
  * 각 overlay 의 .map 을 null 로 두어 정리, 새로 set.
- * remember 로 overlay 들을 보관해서 다음 갱신 때 정리할 수 있게 함.
  */
 @Composable
 private fun CourseOverlays(
@@ -175,7 +274,6 @@ private fun CourseOverlays(
 
     DisposableEffect(naverMap, courses) {
         val map = naverMap
-        // 이전 overlay 정리
         overlays.forEach { it.map = null }
         overlays.clear()
 
@@ -184,17 +282,15 @@ private fun CourseOverlays(
                 val accent = ApexColors.accentFor(c.courseId)
                 val pts = c.toLatLngList().toNaver()
 
-                // 코스 폴리라인
                 val path = PathOverlay().apply {
                     coords = pts
                     color = accent.copy(alpha = 0.85f).toNaverArgb()
-                    width = 18  // px
+                    width = 18
                     outlineWidth = 0
                 }
                 path.map = map
                 overlays.add(path)
 
-                // 출발 마커 (▶) — OverlayImage 의 natural size (Marker.SIZE_AUTO) 사용
                 val startMarker = Marker().apply {
                     position = NaverLatLng(c.startCoord.lat, c.startCoord.lng)
                     icon = startIcon
@@ -209,7 +305,6 @@ private fun CourseOverlays(
                 startMarker.map = map
                 overlays.add(startMarker)
 
-                // 도착 마커 (체커)
                 val endMarker = Marker().apply {
                     position = NaverLatLng(c.endCoord.lat, c.endCoord.lng)
                     icon = finishIcon
@@ -336,75 +431,6 @@ private fun EmptyHint(modifier: Modifier = Modifier) {
             color = ApexColors.TextSec,
             fontSize = 12.sp,
             fontFamily = Pretendard,
-        )
-    }
-}
-
-@Composable
-private fun CoursePeekCard(
-    course: Course,
-    onTap: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val accent = ApexColors.accentFor(course.courseId)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(ApexColors.BgRaised, RoundedCornerShape(22.dp))
-            .border(1.dp, ApexColors.Border, RoundedCornerShape(22.dp))
-            .padding(16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(
-                        Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.4f))),
-                        RoundedCornerShape(14.dp),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("⛰", fontSize = 24.sp, color = ApexColors.Bg)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Overline(text = course.regionName, color = ApexColors.TextTer, tracking = 0.16f)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = course.name,
-                    color = ApexColors.Text,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = Pretendard,
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "${"%.1f".format(course.distanceMeters / 1000.0)} km",
-                        color = ApexColors.TextSec,
-                        fontSize = 12.sp,
-                        fontFamily = Pretendard,
-                    )
-                    Text(
-                        text = "★".repeat(course.difficulty),
-                        color = ApexColors.Amber,
-                        fontSize = 12.sp,
-                        fontFamily = Pretendard,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        PrimaryButton(
-            label = "코스 자세히 보기",
-            onClick = onTap,
-            leadingIcon = {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = ApexColors.Text,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
         )
     }
 }
